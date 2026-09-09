@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Report Workshop | ReconcileFlow{% endblock %}
+{% block content %}
+<section class="module-header workshop-header"><div><a class="back-link" href="{{ url_for('hub') }}">All workflows</a><p class="eyebrow">SIGNATURE FEATURE</p><h1>Report Workshop</h1><p>Build a professional filtered report by deciding exactly what appears before printing.</p></div><button class="button button-primary" type="button" data-print-report>Print or save PDF</button></section>
+<section class="workshop-layout">
+  <aside class="report-controls" aria-label="Report settings">
+    <div><p class="eyebrow">REPORT IDENTITY</p><h2>Content controls</h2></div>
+    <label class="field"><span>Report title</span><input value="Invoice Position Statement" data-report-input="title"></label>
+    <label class="field"><span>Subtitle</span><input value="Marine operations finance review" data-report-input="subtitle"></label>
+    <label class="field"><span>Sent from</span><input value="Finance Operations" data-report-input="sender"></label>
+    <label class="field"><span>Sent to</span><input value="Business Partner" data-report-input="recipient"></label>
+    <label class="field"><span>Prepared by</span><input value="Accounts Team" data-report-input="preparer"></label>
+    <label class="field"><span>Notes</span><textarea rows="3" data-report-input="notes">Prepared for reconciliation review and balance confirmation.</textarea></label>
+    <fieldset><legend>Visible identity</legend><label><input type="checkbox" checked data-report-toggle="sender"> Sender</label><label><input type="checkbox" checked data-report-toggle="recipient"> Recipient</label><label><input type="checkbox" checked data-report-toggle="preparer"> Preparer</label><label><input type="checkbox" checked data-report-toggle="date"> Print date</label><label><input type="checkbox" checked data-report-toggle="notes"> Notes</label></fieldset>
+    <fieldset><legend>Logos</legend><label><input type="checkbox" checked data-logo-toggle="a"> Organization logo</label><label><input type="checkbox" checked data-logo-toggle="b"> Partner logo</label></fieldset>
+    <fieldset><legend>Table columns</legend><label><input type="checkbox" checked data-column-toggle="invoice"> Invoice</label><label><input type="checkbox" checked data-column-toggle="collected"> Collected</label><label><input type="checkbox" checked data-column-toggle="balance"> Balance</label><label><input type="checkbox" checked data-column-toggle="status"> Status</label></fieldset>
+  </aside>
+  <article class="report-preview" data-report-preview>
+    <header class="report-letterhead"><div class="report-logo logo-a" data-report-logo="a">RF<span>OPERATIONS</span></div><div class="report-title"><span>FINANCE CONTROL REPORT</span><h2 data-report-output="title">Invoice Position Statement</h2><p data-report-output="subtitle">Marine operations finance review</p></div><div class="report-logo logo-b" data-report-logo="b">BP<span>PARTNER</span></div></header>
+    <div class="report-meta"><div data-report-field="sender"><span>Sent from</span><strong data-report-output="sender">Finance Operations</strong></div><div data-report-field="recipient"><span>Sent to</span><strong data-report-output="recipient">Business Partner</strong></div><div data-report-field="preparer"><span>Prepared by</span><strong data-report-output="preparer">Accounts Team</strong></div><div data-report-field="date"><span>Report date</span><strong>{{ report_date }}</strong></div></div>
+    <section class="report-metrics"><div><span>Total invoice</span><strong>{{ "{:,.2f}".format(data.summary.invoice) }}</strong></div><div><span>Collected</span><strong>{{ "{:,.2f}".format(data.summary.collected) }}</strong></div><div><span>Net balance</span><strong>{{ "{:,.2f}".format(data.summary.net) }}</strong></div></section>
+    <table class="report-table"><thead><tr><th>Company</th><th data-report-column="invoice">Invoice</th><th data-report-column="collected">Collected</th><th data-report-column="balance">Balance</th><th data-report-column="status">Status</th></tr></thead><tbody>{% for row in data.companies %}<tr><td>{{ row.name }}</td><td data-report-column="invoice">{{ "{:,.2f}".format(row.invoice) }}</td><td data-report-column="collected">{{ "{:,.2f}".format(row.paid + row.payment) }}</td><td data-report-column="balance">{{ "{:,.2f}".format(row.balance) }}</td><td data-report-column="status">{{ row.direction|title }}</td></tr>{% endfor %}</tbody></table>
+    <div class="report-note" data-report-field="notes"><span>Notes</span><p data-report-output="notes">Prepared for reconciliation review and balance confirmation.</p></div>
+    <footer class="report-signatures"><div><span>Prepared by</span><i></i></div><div><span>Reviewed by</span><i></i></div><div><span>Authorized signature and stamp</span><i></i></div></footer>
+  </article>
+</section>
+{% endblock %}

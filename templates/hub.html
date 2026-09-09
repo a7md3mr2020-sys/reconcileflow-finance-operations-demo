@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}ReconcileFlow | Finance Control Portfolio{% endblock %}
+{% block content %}
+<section class="hub-hero">
+  <p class="eyebrow">FINANCE OPERATIONS PRODUCT CASE STUDY</p>
+  <h1>Three control workflows. One reconciliation platform.</h1>
+  <p class="lead">A portfolio-safe demonstration of a broader marine-tour finance system built around operational reconciliation, detailed pricing control, invoice follow-up, and configurable reporting.</p>
+</section>
+
+<section class="mode-grid" aria-label="Choose a workflow">
+  <a class="mode-card standard" href="{{ url_for('index') }}">
+    <span class="mode-index">01</span><p class="eyebrow">CORE CONTROL</p>
+    <h2>Standard Reconciliation</h2>
+    <p>Compare booking references, dates, companies, services, passenger categories, and amounts across two sources.</p>
+    <ul><li>Missing and duplicate detection</li><li>Company-name mapping evidence</li><li>Exception filters and Excel export</li></ul>
+    <strong>Open workflow</strong>
+   </a>
+  <a class="mode-card detailed" href="{{ url_for('detailed_workspace') }}">
+    <span class="mode-index">02</span><p class="eyebrow">PRICING CONTROL</p>
+    <h2>Detailed Reconciliation</h2>
+    <p>Extend the review into trip type, hotel or pickup, transfer state, adult rate, chargeable passengers, and calculated amount.</p>
+    <ul><li>Automatic rate or amount derivation</li><li>Child at half rate; infant at zero</li><li>Independent reference matching</li></ul>
+    <strong>Open workflow</strong>
+  </a>
+  <a class="mode-card invoices" href="{{ url_for('invoice_tracking') }}">
+    <span class="mode-index">03</span><p class="eyebrow">RECEIVABLE CONTROL</p>
+    <h2>Invoice Tracking</h2>
+    <p>Follow each company from review through invoice preparation, sending, payment, and balance closure.</p>
+    <ul><li>Receivable and payable direction</li><li>Payment and collection analysis</li><li>Stage progress and activity history</li></ul>
+    <strong>Open workflow</strong>
+  </a>
+</section>
+
+<section class="signature-band">
+  <div><p class="eyebrow">SIGNATURE FEATURE</p><h2>Report Workshop</h2><p>Control the report title, parties, preparer, date, notes, logos, metrics, and visible columns before printing. The feature reflects the system's report-building workflow without exposing operational branding.</p></div>
+  <a class="button button-primary" href="{{ url_for('report_workshop') }}">Open Report Workshop</a>
+</section>
+
+<section class="control-center-band">
+  <div class="control-center-copy">
+    <p class="eyebrow">BEYOND THE THREE CORE PATHS</p>
+    <h2>The operational control layer</h2>
+    <p>A live, synthetic showcase of the wider product: combined projects, many-to-many company identity, auditable settlements, no-show valuation, exception resolution, and company delivery.</p>
+    <a class="button button-primary" href="{{ url_for('control_center') }}">Open Operations Control Center</a>
+  </div>
+  <div class="control-snapshot" aria-label="Operations control snapshot">
+    <div><span>Combined periods</span><strong>4</strong></div>
+    <div><span>Resolved exceptions</span><strong>459</strong></div>
+    <div><span>No-show value</span><strong>1,635</strong></div>
+    <div><span>Audit coverage</span><strong>100%</strong></div>
+  </div>
+</section>
+
+<section class="capability-map">
+  <div class="section-heading"><div><p class="eyebrow">THREE-MONTH BUILD SCOPE</p><h2>Operational capabilities represented in the case study</h2></div><span class="section-note">Documented in the repository</span></div>
+  <div class="capability-grid">
+    <a href="{{ url_for('control_center', tab='overview') }}"><strong>Multi-project control</strong><span>Combined periods with edits preserved in their source projects.</span></a>
+    <a href="{{ url_for('control_center', tab='no-shows') }}"><strong>Resolution tracking</strong><span>Automatic zero-balance resolution and documented agreement outcomes.</span></a>
+    <a href="{{ url_for('control_center', tab='settlements') }}"><strong>Settlement ledger</strong><span>Amount edits and deletions recorded as auditable financial movements.</span></a>
+    <a href="{{ url_for('control_center', tab='no-shows') }}"><strong>No-show analysis</strong><span>Whole or partial passenger no-shows retained in financial analysis.</span></a>
+    <a href="{{ url_for('control_center', tab='delivery') }}"><strong>Company delivery</strong><span>Track completed company handovers and produce booking-based statements.</span></a>
+    <a href="{{ url_for('report_workshop') }}"><strong>Filter-aware reports</strong><span>Reports and exports use the complete filtered set, not only the visible page.</span></a>
+  </div>
+</section>
+{% endblock %}

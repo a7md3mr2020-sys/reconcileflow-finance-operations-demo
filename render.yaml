@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: reconcileflow-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: waitress-serve --host=0.0.0.0 --port=$PORT app:app
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: RUN_RETENTION_HOURS
+        value: "24"
+      - key: DEMO_DB_PATH
+        value: /tmp/reconcileflow-demo.db

@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+__pycache__
+.pytest_cache
+instance
+uploads
+exports
+tmp
+output
+tests
+docs/screenshots
+*.db
+*.log
+.env*

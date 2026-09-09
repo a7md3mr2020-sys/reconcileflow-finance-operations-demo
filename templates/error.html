@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | ReconcileFlow{% endblock %}
+{% block content %}
+<section class="error-page">
+  <p class="eyebrow">RECONCILEFLOW</p>
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  <a class="button button-primary" href="{{ url_for('hub') }}">Return to workflow hub</a>
+</section>
+{% endblock %}

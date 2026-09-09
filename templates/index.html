@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}ReconcileFlow | Reconciliation Workspace{% endblock %}
+{% block content %}
+<section class="intro-band">
+  <div class="intro-copy">
+    <a class="back-link" href="{{ url_for('hub') }}">All workflows</a>
+    <p class="eyebrow">01 / STANDARD RECONCILIATION</p>
+    <h1>Find financial discrepancies before they become reporting problems.</h1>
+    <p class="lead">Compare two operational datasets, expose missing and inconsistent records, review company-name mappings, and export an audit-ready exception register.</p>
+  </div>
+  <form action="{{ url_for('load_demo') }}" method="post" class="demo-action">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button button-primary" type="submit">Load synthetic demo</button>
+    <span>13 booking references, designed to demonstrate every outcome.</span>
+  </form>
+</section>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="alerts" role="alert">
+      {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<section class="workspace" aria-labelledby="upload-heading">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">NEW REVIEW</p>
+      <h2 id="upload-heading">Upload two source files</h2>
+    </div>
+    <div class="sample-links">
+      <a href="{{ url_for('sample_workbook', system='a') }}">Download System A sample</a>
+      <a href="{{ url_for('sample_workbook', system='b') }}">Download System B sample</a>
+    </div>
+  </div>
+  <form action="{{ url_for('upload_and_reconcile') }}" method="post" enctype="multipart/form-data" class="upload-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field field-wide">
+      <span>Review name</span>
+      <input name="project_name" maxlength="120" placeholder="August marine operations review">
+    </label>
+    <label class="file-field">
+      <span class="file-system">System A</span>
+      <strong>Primary operational source</strong>
+      <small>XLSX or CSV, up to 5 MB</small>
+      <input type="file" name="system_a" accept=".xlsx,.csv" required data-file-input>
+      <span class="file-name" data-file-name>No file selected</span>
+    </label>
+    <label class="file-field">
+      <span class="file-system">System B</span>
+      <strong>Counterparty or control source</strong>
+      <small>XLSX or CSV, up to 5 MB</small>
+      <input type="file" name="system_b" accept=".xlsx,.csv" required data-file-input>
+      <span class="file-name" data-file-name>No file selected</span>
+    </label>
+    <div class="form-submit">
+      <p>Required columns: Reference, Date, Company, Service, Adult, Child, Infant, Amount.</p>
+      <button class="button button-primary" type="submit">Run reconciliation</button>
+    </div>
+  </form>
+</section>
+
+<section class="process-band">
+  <div class="section-heading"><div><p class="eyebrow">CONTROL WORKFLOW</p><h2>From raw records to reviewable exceptions</h2></div></div>
+  <ol class="process-list">
+    <li><span>01</span><strong>Validate</strong><p>Reject malformed files, missing headers, invalid dates, and non-numeric values.</p></li>
+    <li><span>02</span><strong>Normalize</strong><p>Standardize labels and resolve known company aliases before comparison.</p></li>
+    <li><span>03</span><strong>Reconcile</strong><p>Compare date, company, service, passenger mix, amount, and record presence.</p></li>
+    <li><span>04</span><strong>Review</strong><p>Filter discrepancies, inspect mappings, and export an exception register.</p></li>
+  </ol>
+</section>
+{% endblock %}

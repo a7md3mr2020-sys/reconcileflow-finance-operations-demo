@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ReconcileFlow finance operations reconciliation demo">
+  <title>{% block title %}ReconcileFlow{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('hub') }}" aria-label="ReconcileFlow home">
+      <span class="brand-mark" aria-hidden="true">RF</span>
+      <span>ReconcileFlow</span>
+    </a>
+    <nav class="module-nav" aria-label="Portfolio modules">
+      <a href="{{ url_for('index') }}">Standard</a>
+      <a href="{{ url_for('detailed_workspace') }}">Detailed</a>
+      <a href="{{ url_for('invoice_tracking') }}">Invoices</a>
+      <a href="{{ url_for('control_center') }}">Control Center</a>
+      <a href="{{ url_for('report_workshop') }}">Report Workshop</a>
+    </nav>
+    <span class="demo-badge">Public demo</span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>
+    <span>Finance operations reconciliation</span>
+    <span>Synthetic data only</span>
+  </footer>
+</body>
+</html>

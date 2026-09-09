@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ run.project_name }} | ReconcileFlow{% endblock %}
+{% block content %}
+<section class="result-header">
+  <div>
+    <a class="back-link" href="{{ url_for('index') }}">Back to workspace</a>
+    <p class="eyebrow">RECONCILIATION REVIEW</p>
+    <h1>{{ run.project_name }}</h1>
+    <p class="timestamp">Created {{ run.created_at[:10] }} at {{ run.created_at[11:16] }} UTC</p>
+  </div>
+  <a class="button button-primary" href="{{ url_for('export_results', run_id=run.id) }}">Export full results</a>
+</section>
+
+<section class="kpi-grid" aria-label="Reconciliation summary">
+  <article class="kpi kpi-feature"><span>Match rate</span><strong>{{ run.summary.match_rate }}%</strong><small>{{ run.summary.matched }} exact matches</small></article>
+  <article class="kpi"><span>Total references</span><strong>{{ run.summary.total }}</strong><small>{{ run.summary.system_a_rows }} A rows / {{ run.summary.system_b_rows }} B rows</small></article>
+  <article class="kpi"><span>Mismatches</span><strong>{{ run.summary.mismatch }}</strong><small>Field-level differences</small></article>
+  <article class="kpi"><span>Missing records</span><strong>{{ run.summary.missing_a + run.summary.missing_b }}</strong><small>{{ run.summary.missing_a }} in A / {{ run.summary.missing_b }} in B</small></article>
+  <article class="kpi"><span>Duplicates</span><strong>{{ run.summary.duplicates }}</strong><small>Repeated reference keys</small></article>
+  <article class="kpi"><span>Amount variance</span><strong>{{ "{:,.2f}".format(run.summary.amount_variance) }}</strong><small>System A minus System B</small></article>
+</section>
+
+<section class="data-section" aria-labelledby="exceptions-heading">
+  <div class="section-heading">
+    <div><p class="eyebrow">EXCEPTION REGISTER</p><h2 id="exceptions-heading">Record-level results</h2></div>
+    <span class="visible-counter"><strong data-visible-count>{{ run.summary.total }}</strong> visible</span>
+  </div>
+  <div class="table-toolbar" data-table-controls="result-table">
+    <label class="search-field"><span>Search</span><input type="search" placeholder="Reference, company, service..." data-table-search></label>
+    <label class="select-field"><span>Status</span><select data-table-status>
+      <option value="">All statuses</option>
+      <option value="matched">Matched</option>
+      <option value="mismatch">Mismatch</option>
+      <option value="missing_a">Missing in System A</option>
+      <option value="missing_b">Missing in System B</option>
+      <option value="duplicate">Duplicate detected</option>
+    </select></label>
+  </div>
+  <div class="table-wrap">
+    <table id="result-table" data-filter-table>
+      <thead><tr><th>Reference</th><th>Status</th><th>Differences</th><th>System A company</th><th>System B company</th><th class="number">System A amount</th><th class="number">System B amount</th><th class="number">Variance</th></tr></thead>
+      <tbody>
+      {% for row in run.results %}
+        <tr data-status="{{ row.status }}">
+          <td class="reference">{{ row.reference }}</td>
+          <td><span class="status status-{{ row.status }}">{{ row.status_label }}</span></td>
+          <td>{{ row.differences|join(', ') if row.differences else 'None' }}</td>
+          <td>{{ row.system_a.company if row.system_a else 'Not present' }}</td>
+          <td>{{ row.system_b.company if row.system_b else 'Not present' }}</td>
+          <td class="number">{{ "{:,.2f}".format(row.system_a.amount if row.system_a else 0) }}</td>
+          <td class="number">{{ "{:,.2f}".format(row.system_b.amount if row.system_b else 0) }}</td>
+          <td class="number variance {{ 'negative' if row.amount_variance < 0 else 'positive' if row.amount_variance > 0 else '' }}">{{ "{:,.2f}".format(row.amount_variance) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="data-section mapping-section" aria-labelledby="mapping-heading">
+  <div class="section-heading"><div><p class="eyebrow">NORMALIZATION CONTROL</p><h2 id="mapping-heading">Company-name mapping evidence</h2></div><span class="section-note">Observed paired references only</span></div>
+  <div class="table-wrap compact-table">
+    <table>
+      <thead><tr><th>System A label</th><th>System B label</th><th>Normalized A</th><th>Normalized B</th><th>Mapping result</th></tr></thead>
+      <tbody>
+      {% for row in run.mappings %}<tr><td>{{ row.system_a }}</td><td>{{ row.system_b }}</td><td>{{ row.system_a_canonical }}</td><td>{{ row.system_b_canonical }}</td><td><span class="status {{ 'status-matched' if row.mapped else 'status-mismatch' }}">{{ 'Aligned' if row.mapped else 'Review required' }}</span></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

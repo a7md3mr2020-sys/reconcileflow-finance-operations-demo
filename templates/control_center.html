@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Operations Control Center | ReconcileFlow{% endblock %}
+{% block content %}
+<section class="module-header control-header">
+  <div>
+    <a class="back-link" href="{{ url_for('hub') }}">All workflows</a>
+    <p class="eyebrow">ENTERPRISE OPERATIONS LAYER</p>
+    <h1>Operations Control Center</h1>
+    <p>One synthetic workspace demonstrating multi-project control, company unification, settlements, no-shows, resolution tracking, and invoice delivery.</p>
+  </div>
+  <div class="header-actions">
+    <a class="button button-secondary" href="{{ url_for('report_workshop') }}">Report Workshop</a>
+    <a class="button button-primary" href="{{ url_for('control_center_export') }}">Export control workbook</a>
+  </div>
+</section>
+
+<nav class="invoice-tabs control-tabs" aria-label="Operations control views">
+  <a class="{{ 'active' if tab=='overview' }}" href="{{ url_for('control_center', tab='overview') }}">Executive view</a>
+  <a class="{{ 'active' if tab=='companies' }}" href="{{ url_for('control_center', tab='companies') }}">Unified companies</a>
+  <a class="{{ 'active' if tab=='settlements' }}" href="{{ url_for('control_center', tab='settlements') }}">Settlement ledger</a>
+  <a class="{{ 'active' if tab=='no-shows' }}" href="{{ url_for('control_center', tab='no-shows') }}">No-show and resolution</a>
+  <a class="{{ 'active' if tab=='delivery' }}" href="{{ url_for('control_center', tab='delivery') }}">Delivery control</a>
+</nav>
+
+{% if tab == 'overview' %}
+<section class="kpi-grid control-kpis">
+  <article class="kpi kpi-feature"><span>Combined progress</span><strong>{{ data.summary.progress }}%</strong><small>Across {{ data.summary.projects }} monthly projects</small></article>
+  <article class="kpi"><span>Receivable variance</span><strong>{{ "{:,.0f}".format(data.summary.receivable) }}</strong><small>In our favor</small></article>
+  <article class="kpi"><span>Payable variance</span><strong>{{ "{:,.0f}".format(data.summary.payable) }}</strong><small>In partner favor</small></article>
+  <article class="kpi"><span>Resolved exceptions</span><strong>{{ data.summary.resolved }}</strong><small>Automatic plus agreement</small></article>
+  <article class="kpi"><span>No-show value</span><strong>{{ "{:,.0f}".format(data.summary.no_show_value) }}</strong><small>{{ data.summary.no_show_bookings }} retained bookings</small></article>
+  <article class="kpi"><span>Delivered companies</span><strong>{{ data.summary.delivered }}/{{ data.summary.delivery_total }}</strong><small>Approved booking statements</small></article>
+</section>
+
+<section class="control-overview">
+  <div class="data-section project-progress-panel">
+    <div class="section-heading"><div><p class="eyebrow">MULTI-PROJECT CONTROL</p><h2>Four periods acting as one workspace</h2></div><span class="section-note">Source ownership preserved</span></div>
+    <div class="progress-list project-progress">
+      {% for row in data.projects %}
+      <div><span><strong>{{ row.name }}</strong><small>{{ row.companies }} companies · {{ row.open }} open exceptions</small></span><i><b style="width:{{ row.progress }}%"></b></i><em>{{ row.progress }}%</em></div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="data-section balance-command">
+    <div class="section-heading"><div><p class="eyebrow">NET POSITION</p><h2>Financial direction</h2></div></div>
+    <div class="net-position"><span>Combined net variance</span><strong>{{ "{:,.2f}".format(data.summary.net) }}</strong><small>Receivable less payable across selected periods</small></div>
+    <div class="direction-bars">
+      <div><span>Receivable</span><i><b style="width:{{ (data.summary.receivable * 100 / (data.summary.receivable + data.summary.payable))|round }}%"></b></i><strong>{{ "{:,.0f}".format(data.summary.receivable) }}</strong></div>
+      <div class="payable"><span>Payable</span><i><b style="width:{{ (data.summary.payable * 100 / (data.summary.receivable + data.summary.payable))|round }}%"></b></i><strong>{{ "{:,.0f}".format(data.summary.payable) }}</strong></div>
+    </div>
+  </div>
+</section>
+
+<section class="capability-strip" aria-label="Operational control chain">
+  <div><span>01</span><strong>Unify</strong><small>Many labels to one controlled company</small></div>
+  <div><span>02</span><strong>Reconcile</strong><small>Standard and detailed evidence</small></div>
+  <div><span>03</span><strong>Resolve</strong><small>Automatic or documented agreement</small></div>
+  <div><span>04</span><strong>Audit</strong><small>Every amount movement remains visible</small></div>
+  <div><span>05</span><strong>Deliver</strong><small>Approved statement and handover status</small></div>
+</section>
+
+{% elif tab == 'companies' %}
+<section class="data-section control-table-section">
+  <div class="section-heading"><div><p class="eyebrow">MANY-TO-MANY IDENTITY CONTROL</p><h2>Unified company groups across projects</h2></div><span class="visible-counter"><strong data-visible-count>{{ data.company_links|length }}</strong> groups</span></div>
+  <div class="table-toolbar" data-table-controls="company-link-table">
+    <label class="search-field"><span>Search company or alias</span><input type="search" placeholder="Search all source labels..." data-table-search></label>
+    <label class="select-field"><span>Link status</span><select data-table-status><option value="">All statuses</option><option value="approved">Approved</option><option value="review">Needs review</option></select></label>
+  </div>
+  <div class="table-wrap"><table id="company-link-table" data-filter-table><thead><tr><th>Unified company</th><th>System A labels</th><th>System B labels</th><th class="number">Projects</th><th class="number">Aliases</th><th class="number">Confidence</th><th>Status</th></tr></thead><tbody>
+    {% for row in data.company_links %}<tr data-status="{{ row.status }}"><td><strong>{{ row.canonical }}</strong></td><td>{{ row.system_a }}</td><td>{{ row.system_b }}</td><td class="number">{{ row.projects }}</td><td class="number">{{ row.aliases }}</td><td class="number"><span class="confidence">{{ row.confidence }}%</span></td><td><span class="stage stage-{{ 'paid' if row.status=='approved' else 'prepared' }}">{{ row.status|title }}</span></td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="table-note">A group can contain repeated labels from either source and explicit “not present” states without losing the original project relationship.</p>
+</section>
+
+{% elif tab == 'settlements' %}
+<section class="kpi-grid compact-kpis">
+  <article class="kpi kpi-feature"><span>Filtered movement</span><strong data-table-total="settlement-table">{{ "{:,.2f}".format(data.summary.settlement_movement) }}</strong><small>Updates with the visible ledger</small></article>
+  <article class="kpi"><span>Audit entries</span><strong>{{ data.settlements|length }}</strong><small>Corrections, deletion, and agreement</small></article>
+  <article class="kpi"><span>Periods represented</span><strong>3</strong><small>Original project retained per movement</small></article>
+</section>
+<section class="data-section control-table-section">
+  <div class="section-heading"><div><p class="eyebrow">FINANCIAL AUDIT TRAIL</p><h2>Settlement movement ledger</h2></div><span class="visible-counter"><strong data-visible-count>{{ data.settlements|length }}</strong> movements</span></div>
+  <div class="table-toolbar" data-table-controls="settlement-table">
+    <label class="search-field"><span>Search ledger</span><input type="search" placeholder="Reference, company, project, action..." data-table-search></label>
+    <label class="select-field"><span>Movement type</span><select data-table-status><option value="">All movements</option><option value="decrease">Amount decreased</option><option value="increase">Amount increased</option><option value="deletion">Booking deleted</option><option value="agreement">Agreement resolution</option></select></label>
+  </div>
+  <div class="table-wrap"><table id="settlement-table" data-filter-table data-sum-column="7"><thead><tr><th>Date</th><th>Time</th><th>Project</th><th>Reference</th><th>Company</th><th>Action</th><th class="number">Before</th><th class="number">Movement</th><th class="number">After</th></tr></thead><tbody>
+    {% for row in data.settlements %}<tr data-status="{{ row.status }}"><td>{{ row.date }}</td><td>{{ row.time }}</td><td>{{ row.project }}</td><td>{{ row.reference }}</td><td>{{ row.company }}</td><td>{{ row.action }}</td><td class="number">{{ "{:,.2f}".format(row.before) }}</td><td class="number variance {{ 'positive' if row.movement > 0 else 'negative' }}" data-value="{{ row.movement }}">{{ "{:,.2f}".format(row.movement) }}</td><td class="number">{{ "{:,.2f}".format(row.after) }}</td></tr>{% endfor %}
+  </tbody><tfoot><tr><td colspan="7">Visible settlement movement</td><td class="number" data-filter-total>{{ "{:,.2f}".format(data.summary.settlement_movement) }}</td><td></td></tr></tfoot></table></div>
+</section>
+
+{% elif tab == 'no-shows' %}
+<section class="kpi-grid compact-kpis">
+  <article class="kpi kpi-feature"><span>No-show bookings</span><strong>{{ data.summary.no_show_bookings }}</strong><small>Retained in reconciliation totals</small></article>
+  <article class="kpi"><span>No-show value</span><strong>{{ "{:,.2f}".format(data.summary.no_show_value) }}</strong><small>Adults and children separated</small></article>
+  <article class="kpi"><span>Open exceptions</span><strong>{{ data.summary.open }}</strong><small>Across company resolution registers</small></article>
+</section>
+<section class="data-section control-table-section">
+  <div class="section-heading"><div><p class="eyebrow">NO-SHOW CONTROL</p><h2>Whole and partial booking evidence</h2></div><span class="visible-counter"><strong data-visible-count>{{ data.no_shows|length }}</strong> bookings</span></div>
+  <div class="table-toolbar" data-table-controls="no-show-table">
+    <label class="search-field"><span>Search no-shows</span><input type="search" placeholder="Reference, company, shape..." data-table-search></label>
+    <label class="select-field"><span>Review status</span><select data-table-status><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="review">Needs review</option></select></label>
+  </div>
+  <div class="table-wrap"><table id="no-show-table" data-filter-table data-sum-column="7"><thead><tr><th>Reference</th><th>Date</th><th>Company</th><th>Detected shape</th><th class="number">Adult</th><th class="number">Child</th><th class="number">Infant</th><th class="number">Value</th><th>Resolution</th></tr></thead><tbody>
+    {% for row in data.no_shows %}<tr data-status="{{ row.status }}"><td><strong>{{ row.reference }}</strong></td><td>{{ row.date }}</td><td>{{ row.company }}</td><td>{{ row.shape }}</td><td class="number">{{ row.adult }}</td><td class="number">{{ row.child }}</td><td class="number">{{ row.infant }}</td><td class="number" data-value="{{ row.value }}">{{ "{:,.2f}".format(row.value) }}</td><td><span class="stage stage-{{ 'paid' if row.resolution=='automatic' else 'matched' if row.resolution=='manual' else 'prepared' }}">{{ row.resolution|title }}</span></td></tr>{% endfor %}
+  </tbody><tfoot><tr><td colspan="7">Visible no-show value</td><td class="number" data-filter-total>{{ "{:,.2f}".format(data.summary.no_show_value) }}</td><td></td></tr></tfoot></table></div>
+</section>
+<section class="data-section resolution-section">
+  <div class="section-heading"><div><p class="eyebrow">RESOLUTION REGISTER</p><h2>Automatic zero balance versus documented agreement</h2></div></div>
+  <div class="resolution-grid">{% for row in data.resolutions %}<article><header><strong>{{ row.company }}</strong><span>{{ row.open }} open</span></header><div><b>{{ row.automatic }}</b><small>Automatic</small></div><div><b>{{ row.agreement }}</b><small>By agreement</small></div><footer><span>Resolved value</span><strong>{{ "{:,.0f}".format(row.resolved_value) }}</strong></footer></article>{% endfor %}</div>
+</section>
+
+{% else %}
+<section class="kpi-grid compact-kpis">
+  <article class="kpi kpi-feature"><span>Delivered</span><strong>{{ data.summary.delivered }}/{{ data.summary.delivery_total }}</strong><small>Company handovers completed</small></article>
+  <article class="kpi"><span>Delivered invoice value</span><strong>{{ "{:,.0f}".format(data.deliveries|selectattr('status','equalto','delivered')|sum(attribute='invoice')) }}</strong><small>Based on adjusted System A bookings</small></article>
+  <article class="kpi"><span>Awaiting delivery</span><strong>{{ data.summary.delivery_total - data.summary.delivered }}</strong><small>Ready and pending companies</small></article>
+</section>
+<section class="data-section control-table-section">
+  <div class="section-heading"><div><p class="eyebrow">COMPANY HANDOVER CONTROL</p><h2>Delivery and approved statement readiness</h2></div><span class="visible-counter"><strong data-visible-count>{{ data.deliveries|length }}</strong> companies</span></div>
+  <div class="table-toolbar" data-table-controls="delivery-table">
+    <label class="search-field"><span>Search delivery register</span><input type="search" placeholder="Company or project..." data-table-search></label>
+    <label class="select-field"><span>Delivery status</span><select data-table-status><option value="">All statuses</option><option value="delivered">Delivered</option><option value="ready">Ready</option><option value="pending">Pending</option></select></label>
+  </div>
+  <div class="table-wrap"><table id="delivery-table" data-filter-table data-sum-column="3"><thead><tr><th>Company</th><th>Project</th><th class="number">Bookings</th><th class="number">Approved invoice</th><th>Delivered on</th><th>Status</th><th>Statement</th></tr></thead><tbody>
+    {% for row in data.deliveries %}<tr data-status="{{ row.status }}"><td><strong>{{ row.company }}</strong></td><td>{{ row.project }}</td><td class="number">{{ row.bookings }}</td><td class="number" data-value="{{ row.invoice }}">{{ "{:,.2f}".format(row.invoice) }}</td><td>{{ row.delivered_on or '—' }}</td><td><span class="stage stage-{{ 'paid' if row.status=='delivered' else 'prepared' if row.status=='ready' else 'waiting' }}">{{ row.status|title }}</span></td><td><a href="{{ url_for('report_workshop') }}">Preview report</a></td></tr>{% endfor %}
+  </tbody><tfoot><tr><td colspan="3">Visible approved invoice value</td><td class="number" data-filter-total>{{ "{:,.2f}".format(data.deliveries|sum(attribute='invoice')) }}</td><td colspan="3"></td></tr></tfoot></table></div>
+  <p class="table-note">The operational product generates a company booking statement with configurable identity, notes, signatures, and stamp area through the Report Workshop.</p>
+</section>
+{% endif %}
+{% endblock %}
