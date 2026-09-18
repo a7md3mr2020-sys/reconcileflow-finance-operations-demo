@@ -33,10 +33,10 @@ from reconcileflow.sample_data import HEADERS, SYSTEM_A, SYSTEM_B, records
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE_PATH = Path(os.environ.get("DEMO_DB_PATH", Path(tempfile.gettempdir()) / "reconcileflow-demo.db"))
+DATABASE_PATH = Path(os.environ.get("DEMO_DB_PATH") or Path(tempfile.gettempdir()) / "reconcileflow-demo.db")
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
-RUN_RETENTION_HOURS = int(os.environ.get("RUN_RETENTION_HOURS", "24"))
+RUN_RETENTION_HOURS = int(os.environ.get("RUN_RETENTION_HOURS") or "24")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)

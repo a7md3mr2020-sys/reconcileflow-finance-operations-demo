@@ -1,9 +1,29 @@
 import io
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 
 import app as app_module
 from reconcileflow.sample_data import HEADERS, SYSTEM_A, SYSTEM_B
+
+
+def test_empty_host_environment_values_use_safe_defaults():
+    environment = os.environ.copy()
+    environment.update({"DEMO_DB_PATH": "", "RUN_RETENTION_HOURS": ""})
+    result = subprocess.run(
+        [sys.executable, "-c", "import app; print(app.RUN_RETENTION_HOURS, app.DATABASE_PATH.name)"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "24 reconcileflow-demo.db"
 
 
 def csrf(client):
