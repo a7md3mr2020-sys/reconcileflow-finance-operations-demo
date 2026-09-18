@@ -6,6 +6,17 @@ ReconcileFlow is a portfolio-safe product case study built from three connected 
 
 The complete runtime interface is available in English and Arabic. The language switch persists across navigation and changes page direction, workflow navigation, tabs, filters, table headings, statuses, dashboards, and report controls together.
 
+## Live demo
+
+**[Open the HR-ready live product](https://reconcileflow-finance-operations-de.vercel.app/)**
+
+No login is required and every record is synthetic. For a focused review, open a ready multi-project workspace directly:
+
+- [Try Standard Reconciliation](https://reconcileflow-finance-operations-de.vercel.app/try/standard)
+- [Try Detailed Reconciliation](https://reconcileflow-finance-operations-de.vercel.app/try/detailed)
+- [Open Invoice Tracking](https://reconcileflow-finance-operations-de.vercel.app/invoice-tracking)
+- [Open the Report Workshop](https://reconcileflow-finance-operations-de.vercel.app/report-workshop)
+
 ![ReconcileFlow workflow hub](docs/screenshots/hub.png)
 
 ## Three product paths
