@@ -23,6 +23,24 @@
   {% endif %}
 {% endwith %}
 
+<section class="project-library" aria-labelledby="standard-projects-heading">
+  <div class="section-heading">
+    <div><p class="eyebrow">STANDARD PROJECTS</p><h2 id="standard-projects-heading">Monthly reconciliation projects</h2></div>
+    <span class="section-note">Select two or more projects to review them as one workspace</span>
+  </div>
+  <form action="{{ url_for('combined_projects', mode='standard') }}" method="get" class="project-picker">
+    <div class="project-grid">
+      {% for project in projects %}
+      <article class="project-card">
+        <label class="project-card-selector"><input type="checkbox" name="project" value="{{ project.id }}"><span class="project-card-head"><b>{{ project.project_name }}</b><i>{{ project.created_at[:10] }}</i></span><span class="project-card-kpis"><em><strong>{{ project.summary.total }}</strong> References</em><em><strong>{{ project.summary.match_rate }}%</strong> Match rate</em><em><strong>{{ "{:,.2f}".format(project.summary.amount_variance) }}</strong> Variance</em></span></label>
+        <span class="project-card-foot"><a href="{{ url_for('combined_projects', mode='standard', project=project.id) }}">Open project</a><small>{{ "{:,.2f}".format(project.movement_total) }} movement</small></span>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="project-picker-actions"><span data-project-selection>0 projects selected</span><button class="button button-primary" type="submit" disabled data-open-projects>Open combined workspace</button></div>
+  </form>
+</section>
+
 <section class="workspace" aria-labelledby="upload-heading">
   <div class="section-heading">
     <div>

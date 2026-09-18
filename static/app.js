@@ -11,7 +11,7 @@ document.querySelectorAll("[data-table-controls]").forEach((controls) => {
   const status = controls.querySelector("[data-table-status]");
   const section = controls.closest(".data-section");
   const counter = section?.querySelector("[data-visible-count]");
-  const rows = Array.from(table.tBodies[0].rows);
+  let rows = Array.from(table.tBodies[0].rows);
   const storageKey = `reconcileflow-table-filter:${window.location.pathname}:${table.id}`;
   let savedFilter = {};
   try { savedFilter = JSON.parse(sessionStorage.getItem(storageKey) || "{}"); } catch (_error) { savedFilter = {}; }
@@ -19,6 +19,7 @@ document.querySelectorAll("[data-table-controls]").forEach((controls) => {
   if (savedFilter.status !== undefined) status.value = savedFilter.status;
 
   const applyFilters = () => {
+    rows = Array.from(table.tBodies[0].rows);
     const query = search.value.trim().toLocaleLowerCase();
     let visible = 0;
     rows.forEach((row) => {
@@ -45,7 +46,90 @@ document.querySelectorAll("[data-table-controls]").forEach((controls) => {
 
   search.addEventListener("input", applyFilters);
   status.addEventListener("change", applyFilters);
+  table.addEventListener("reconcileflow:table-changed", applyFilters);
   applyFilters();
+});
+
+document.querySelectorAll(".project-picker").forEach((picker) => {
+  const checkboxes = Array.from(picker.querySelectorAll('input[name="project"]'));
+  const output = picker.querySelector("[data-project-selection]");
+  const button = picker.querySelector("[data-open-projects]");
+  const update = () => {
+    const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
+    const label = `${selected} projects selected`;
+    output.textContent = window.reconcileflowTranslateText?.(label) || label;
+    button.disabled = selected < 2;
+  };
+  checkboxes.forEach((checkbox) => checkbox.addEventListener("change", update));
+  update();
+});
+
+const formatAmount = (value) => Number(value).toLocaleString("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+document.querySelectorAll("[data-amount-form]").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = form.querySelector('input[name="amount"]');
+    const button = form.querySelector("button");
+    const row = form.closest("tr");
+    const previousStatus = row.dataset.status;
+    button.disabled = true;
+    form.classList.remove("is-error", "is-saved");
+    input.setCustomValidity("");
+    try {
+      const response = await fetch(form.action, { method: "POST", body: new FormData(form), headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "The adjustment could not be saved.");
+
+      input.value = Number(data.movement.after).toFixed(2);
+      const variance = row.querySelector("[data-row-variance]");
+      variance.dataset.value = data.row.amount_variance;
+      variance.textContent = formatAmount(data.row.amount_variance);
+      variance.classList.toggle("positive", data.row.amount_variance > 0);
+      variance.classList.toggle("negative", data.row.amount_variance < 0);
+      row.dataset.status = data.row.status;
+      const status = row.querySelector("[data-row-status]");
+      status.className = `status status-${data.row.status}`;
+      status.textContent = data.row.status_label;
+      row.querySelector("[data-row-differences]").textContent = data.row.differences.join(", ") || "None";
+      window.reconcileflowTranslateElement?.(row);
+
+      const bookingTable = row.closest("table");
+      const allBookingRows = Array.from(bookingTable.tBodies[0].rows);
+      const combinedVariance = allBookingRows.reduce((sum, item) => sum + Number(item.querySelector("[data-row-variance]")?.dataset.value || 0), 0);
+      document.querySelector("[data-combined-variance]").textContent = formatAmount(combinedVariance);
+      if (previousStatus !== data.row.status) {
+        document.querySelector("[data-combined-matched]").textContent = allBookingRows.filter((item) => item.dataset.status === "matched").length;
+      }
+
+      const movementBody = document.querySelector("[data-movement-body]");
+      const movementRow = document.createElement("tr");
+      movementRow.dataset.status = data.movement.side;
+      movementRow.innerHTML = `<td>${data.movement.occurred_at.slice(0, 16).replace("T", " ")}</td><td></td><td class="reference"></td><td></td><td class="number">${formatAmount(data.movement.before)}</td><td class="number">${formatAmount(data.movement.after)}</td><td class="number variance ${data.movement.movement > 0 ? "positive" : data.movement.movement < 0 ? "negative" : ""}" data-value="${data.movement.movement}">${formatAmount(data.movement.movement)}</td><td></td>`;
+      movementRow.cells[1].textContent = data.movement.project;
+      movementRow.cells[2].textContent = data.movement.reference;
+      movementRow.cells[3].textContent = data.movement.side === "system_a" ? "System A" : "System B";
+      movementRow.cells[7].textContent = data.movement.action;
+      movementBody.prepend(movementRow);
+      window.reconcileflowTranslateElement?.(movementRow);
+      movementBody.closest("table").dispatchEvent(new CustomEvent("reconcileflow:table-changed"));
+      const combinedMovement = Array.from(movementBody.rows).reduce((sum, item) => sum + Number(item.cells[6]?.dataset.value || 0), 0);
+      document.querySelector("[data-combined-movement]").textContent = formatAmount(combinedMovement);
+      bookingTable.dispatchEvent(new CustomEvent("reconcileflow:table-changed"));
+      form.classList.add("is-saved");
+      window.setTimeout(() => form.classList.remove("is-saved"), 1400);
+    } catch (error) {
+      form.classList.add("is-error");
+      input.setCustomValidity(error.message);
+      input.reportValidity();
+      input.addEventListener("input", () => input.setCustomValidity(""), { once: true });
+    } finally {
+      button.disabled = false;
+    }
+  });
 });
 
 const reportPreview = document.querySelector("[data-report-preview]");

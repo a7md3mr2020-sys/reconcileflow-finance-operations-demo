@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ language }}" dir="{{ text_direction }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="ReconcileFlow finance operations reconciliation demo">
   <title>{% block title %}ReconcileFlow{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script src="{{ url_for('static', filename='i18n.js') }}" defer></script>
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
@@ -21,7 +22,13 @@
       <a href="{{ url_for('control_center') }}">Control Center</a>
       <a href="{{ url_for('report_workshop') }}">Report Workshop</a>
     </nav>
-    <span class="demo-badge">Public demo</span>
+    <div class="header-tools">
+      <div class="language-switch" aria-label="Language">
+        <a class="{{ 'active' if language == 'en' }}" href="{{ url_for('set_language', language='en', next=request.full_path.rstrip('?')) }}" lang="en">EN</a>
+        <a class="{{ 'active' if language == 'ar' }}" href="{{ url_for('set_language', language='ar', next=request.full_path.rstrip('?')) }}" lang="ar">ع</a>
+      </div>
+      <span class="demo-badge">Public demo</span>
+    </div>
   </header>
   <main>{% block content %}{% endblock %}</main>
   <footer>

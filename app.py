@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import os
 import secrets
 import sqlite3
+import tempfile
 import zipfile
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -30,7 +33,7 @@ from reconcileflow.sample_data import HEADERS, SYSTEM_A, SYSTEM_B, records
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE_PATH = Path(os.environ.get("DEMO_DB_PATH", BASE_DIR / "instance" / "reconcileflow-demo.db"))
+DATABASE_PATH = Path(os.environ.get("DEMO_DB_PATH", Path(tempfile.gettempdir()) / "reconcileflow-demo.db"))
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 RUN_RETENTION_HOURS = int(os.environ.get("RUN_RETENTION_HOURS", "24"))
@@ -60,19 +63,45 @@ def init_database():
                    id TEXT PRIMARY KEY,
                    project_name TEXT NOT NULL,
                    payload_json TEXT NOT NULL,
+                   mode TEXT NOT NULL DEFAULT 'standard',
                    created_at TEXT NOT NULL
                )"""
         )
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(demo_runs)")}
+        if "mode" not in columns:
+            connection.execute("ALTER TABLE demo_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'standard'")
+        connection.execute(
+            "UPDATE demo_runs SET mode='detailed' WHERE mode='standard' AND LOWER(project_name) LIKE '%detailed%'"
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS financial_movements(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   run_id TEXT NOT NULL,
+                   mode TEXT NOT NULL,
+                   occurred_at TEXT NOT NULL,
+                   reference TEXT NOT NULL,
+                   side TEXT NOT NULL,
+                   before_amount REAL NOT NULL,
+                   after_amount REAL NOT NULL,
+                   movement REAL NOT NULL,
+                   action TEXT NOT NULL
+               )"""
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_financial_movements_run ON financial_movements(run_id, id DESC)"
+        )
 
 
-def store_run(project_name, payload):
-    run_id = uuid4().hex
+def store_run(project_name, payload, mode="standard", run_id=None):
+    if mode not in {"standard", "detailed"}:
+        raise ValueError("Unsupported reconciliation mode.")
+    run_id = run_id or uuid4().hex
     with database() as connection:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
-        connection.execute("DELETE FROM demo_runs WHERE created_at < ?", (cutoff,))
+        connection.execute("DELETE FROM demo_runs WHERE created_at < ? AND id NOT LIKE 'portfolio-%'", (cutoff,))
         connection.execute(
-            "INSERT INTO demo_runs(id,project_name,payload_json,created_at) VALUES(?,?,?,?)",
-            (run_id, project_name[:120], json.dumps(payload, separators=(",", ":")), datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO demo_runs(id,project_name,payload_json,mode,created_at) VALUES(?,?,?,?,?)",
+            (run_id, project_name[:120], json.dumps(payload, separators=(",", ":")), mode, datetime.now(timezone.utc).isoformat()),
         )
     return run_id
 
@@ -80,11 +109,156 @@ def store_run(project_name, payload):
 def get_run(run_id):
     with database() as connection:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
-        connection.execute("DELETE FROM demo_runs WHERE created_at < ?", (cutoff,))
+        connection.execute("DELETE FROM demo_runs WHERE created_at < ? AND id NOT LIKE 'portfolio-%'", (cutoff,))
         row = connection.execute("SELECT * FROM demo_runs WHERE id=?", (run_id,)).fetchone()
     if not row:
         return None
-    return {"id": row["id"], "project_name": row["project_name"], "created_at": row["created_at"], **json.loads(row["payload_json"])}
+    return {
+        "id": row["id"], "project_name": row["project_name"], "mode": row["mode"],
+        "created_at": row["created_at"], **json.loads(row["payload_json"]),
+    }
+
+
+STATUS_LABELS = {
+    "matched": "Matched",
+    "mismatch": "Mismatch",
+    "missing_a": "Missing in System A",
+    "missing_b": "Missing in System B",
+    "duplicate": "Duplicate detected",
+}
+
+
+def recalculate_payload(payload, mode):
+    """Rebuild row and project totals after an audited amount adjustment."""
+    for row in payload["results"]:
+        left, right = row.get("system_a"), row.get("system_b")
+        row["amount_variance"] = round((left or {}).get("amount", 0) - (right or {}).get("amount", 0), 2)
+        if left and right:
+            differences = [item for item in row.get("differences", []) if item != "Amount"]
+            if abs(row["amount_variance"]) >= 0.01:
+                differences.append("Amount")
+            row["differences"] = differences
+            duplicate = left.get("row_count", 1) > 1 or right.get("row_count", 1) > 1
+            row["status"] = "duplicate" if duplicate else ("mismatch" if differences else "matched")
+            row["status_label"] = STATUS_LABELS[row["status"]]
+
+    counts = Counter(row["status"] for row in payload["results"])
+    summary = payload["summary"]
+    total = len(payload["results"])
+    summary.update({
+        "total": total,
+        "matched": counts["matched"],
+        "mismatch": counts["mismatch"],
+        "missing_a": counts["missing_a"],
+        "missing_b": counts["missing_b"],
+        "duplicates": counts["duplicate"],
+        "match_rate": round(counts["matched"] * 100 / total, 1) if total else 0,
+        "amount_variance": round(sum(row["amount_variance"] for row in payload["results"]), 2),
+    })
+    if mode == "detailed":
+        summary["pricing_variance_a"] = round(sum(
+            (row.get("system_a") or {}).get("pricing_variance", 0) for row in payload["results"]
+        ), 2)
+        summary["pricing_variance_b"] = round(sum(
+            (row.get("system_b") or {}).get("pricing_variance", 0) for row in payload["results"]
+        ), 2)
+    return payload
+
+
+def list_projects(mode):
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
+    with database() as connection:
+        connection.execute("DELETE FROM demo_runs WHERE created_at < ? AND id NOT LIKE 'portfolio-%'", (cutoff,))
+        rows = connection.execute(
+            "SELECT * FROM demo_runs WHERE mode=? ORDER BY created_at DESC, project_name", (mode,)
+        ).fetchall()
+        movement_totals = {
+            row["run_id"]: row["total"] for row in connection.execute(
+                "SELECT run_id, ROUND(SUM(movement), 2) AS total FROM financial_movements GROUP BY run_id"
+            )
+        }
+    projects = []
+    for row in rows:
+        payload = json.loads(row["payload_json"])
+        projects.append({
+            "id": row["id"], "project_name": row["project_name"], "mode": row["mode"],
+            "created_at": row["created_at"], "summary": payload["summary"],
+            "movement_total": movement_totals.get(row["id"], 0),
+        })
+    return projects
+
+
+def ensure_sample_projects(mode):
+    definitions = (
+        ("may", "May 2026 marine operations", 0),
+        ("june", "June 2026 marine operations", 25),
+        ("july", "July 2026 marine operations", -40),
+    )
+    prefix = "standard" if mode == "standard" else "detailed"
+    with database() as connection:
+        existing = {row["id"] for row in connection.execute("SELECT id FROM demo_runs WHERE mode=?", (mode,))}
+    for month, name, delta in definitions:
+        run_id = f"portfolio-{prefix}-{month}"
+        if run_id in existing:
+            continue
+        payload = reconcile(records(SYSTEM_A), records(SYSTEM_B)) if mode == "standard" else reconcile_detailed(
+            detailed_records(DETAILED_A), detailed_records(DETAILED_B)
+        )
+        payload = json.loads(json.dumps(payload))
+        if delta:
+            target = next(row for row in payload["results"] if row.get("system_a") and row.get("system_b"))
+            target["system_a"]["amount"] = round(target["system_a"]["amount"] + delta, 2)
+            if mode == "detailed":
+                target["system_a"]["pricing_variance"] = round(
+                    target["system_a"]["amount"] - target["system_a"].get("calculated_amount", 0), 2
+                )
+            recalculate_payload(payload, mode)
+        store_run(name, payload, mode=mode, run_id=run_id)
+
+
+def selected_projects(mode, project_ids):
+    unique_ids = list(dict.fromkeys(project_ids))[:12]
+    projects = []
+    for run_id in unique_ids:
+        run = get_run(run_id)
+        if run and run["mode"] == mode:
+            projects.append(run)
+    return projects
+
+
+def movement_rows(run_ids):
+    if not run_ids:
+        return []
+    placeholders = ",".join("?" for _ in run_ids)
+    with database() as connection:
+        rows = connection.execute(
+            f"""SELECT m.*, r.project_name FROM financial_movements m
+                JOIN demo_runs r ON r.id=m.run_id
+                WHERE m.run_id IN ({placeholders}) ORDER BY m.id DESC""",
+            run_ids,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def combined_workspace_payload(mode, projects):
+    rows = []
+    for project in projects:
+        for result in project["results"]:
+            rows.append({**result, "project_id": project["id"], "project_name": project["project_name"]})
+    movements = movement_rows([project["id"] for project in projects])
+    return {
+        "mode": mode,
+        "projects": projects,
+        "rows": rows,
+        "movements": movements,
+        "summary": {
+            "projects": len(projects),
+            "references": len(rows),
+            "matched": sum(row["status"] == "matched" for row in rows),
+            "amount_variance": round(sum(row["amount_variance"] for row in rows), 2),
+            "movement_total": round(sum(row["movement"] for row in movements), 2),
+        },
+    }
 
 
 def validate_file(upload):
@@ -162,20 +336,58 @@ app.jinja_env.globals["csrf_token"] = csrf_token
 init_database()
 
 
+SUPPORTED_LANGUAGES = {"en", "ar"}
+
+
+def current_language():
+    language = session.get("language", "en")
+    return language if language in SUPPORTED_LANGUAGES else "en"
+
+
+@app.context_processor
+def inject_language():
+    language = current_language()
+    return {"language": language, "text_direction": "rtl" if language == "ar" else "ltr"}
+
+
+@app.get("/language/<language>")
+def set_language(language):
+    if language not in SUPPORTED_LANGUAGES:
+        abort(404)
+    next_path = request.args.get("next", "/")
+    if not next_path.startswith("/") or next_path.startswith("//") or "\\" in next_path:
+        next_path = "/"
+    session["language"] = language
+    return redirect(next_path)
+
+
 @app.get("/")
 def hub():
     return render_template("hub.html")
 
 
+@app.get("/try/<mode>")
+def try_live_demo(mode):
+    if mode not in {"standard", "detailed"}:
+        abort(404)
+    ensure_sample_projects(mode)
+    prefix = "standard" if mode == "standard" else "detailed"
+    return redirect(url_for(
+        "combined_projects", mode=mode,
+        project=[f"portfolio-{prefix}-may", f"portfolio-{prefix}-june"],
+    ))
+
+
 @app.get("/standard")
 def index():
-    return render_template("index.html")
+    ensure_sample_projects("standard")
+    return render_template("index.html", projects=list_projects("standard"))
 
 
 @app.post("/demo")
 def load_demo():
     payload = reconcile(records(SYSTEM_A), records(SYSTEM_B))
-    run_id = store_run("Synthetic marine-tour operations demo", payload)
+    run_id = store_run("Synthetic marine-tour operations demo", payload, mode="standard")
     return redirect(url_for("results", run_id=run_id))
 
 
@@ -189,7 +401,7 @@ def upload_and_reconcile():
         system_a = read_dataset(system_a_file.stream, system_a_file.filename)
         system_b = read_dataset(system_b_file.stream, system_b_file.filename)
         payload = reconcile(system_a, system_b)
-        run_id = store_run(request.form.get("project_name", "").strip() or "Reconciliation review", payload)
+        run_id = store_run(request.form.get("project_name", "").strip() or "Reconciliation review", payload, mode="standard")
         return redirect(url_for("results", run_id=run_id))
     except ValueError as exc:
         flash(str(exc), "error")
@@ -294,13 +506,14 @@ def sample_workbook(system):
 
 @app.get("/detailed")
 def detailed_workspace():
-    return render_template("detailed.html")
+    ensure_sample_projects("detailed")
+    return render_template("detailed.html", projects=list_projects("detailed"))
 
 
 @app.post("/detailed/demo")
 def load_detailed_demo():
     payload = reconcile_detailed(detailed_records(DETAILED_A), detailed_records(DETAILED_B))
-    run_id = store_run("Synthetic detailed marine-tour review", payload)
+    run_id = store_run("Synthetic detailed marine-tour review", payload, mode="detailed")
     return redirect(url_for("detailed_results", run_id=run_id))
 
 
@@ -316,6 +529,7 @@ def upload_detailed():
         run_id = store_run(
             request.form.get("project_name", "").strip() or "Detailed reconciliation review",
             reconcile_detailed(left, right),
+            mode="detailed",
         )
         return redirect(url_for("detailed_results", run_id=run_id))
     except ValueError as exc:
@@ -399,6 +613,139 @@ def detailed_sample(system):
     workbook.save(output)
     output.seek(0)
     return send_file(output, as_attachment=True, download_name=f"detailed-system-{system.lower()}-demo.xlsx")
+
+
+@app.get("/projects/<mode>/combined")
+def combined_projects(mode):
+    if mode not in {"standard", "detailed"}:
+        abort(404)
+    ensure_sample_projects(mode)
+    projects = selected_projects(mode, request.args.getlist("project"))
+    if not projects:
+        return redirect(url_for("index" if mode == "standard" else "detailed_workspace"))
+    return render_template("project_workspace.html", workspace=combined_workspace_payload(mode, projects))
+
+
+@app.get("/projects/<mode>/combined/export.xlsx")
+def combined_projects_export(mode):
+    if mode not in {"standard", "detailed"}:
+        abort(404)
+    projects = selected_projects(mode, request.args.getlist("project"))
+    if not projects:
+        abort(404)
+    data = combined_workspace_payload(mode, projects)
+    workbook = Workbook()
+    summary = workbook.active
+    summary.title = "Combined Summary"
+    summary.append(["Metric", "Value"])
+    for label, key in (
+        ("Projects", "projects"), ("References", "references"), ("Exact matches", "matched"),
+        ("Amount variance", "amount_variance"), ("Settlement movement", "movement_total"),
+    ):
+        summary.append([label, data["summary"][key]])
+    summary.append([])
+    summary.append(["Included projects", "Mode"])
+    for project in projects:
+        summary.append([excel_safe(project["project_name"]), mode.title()])
+    format_export_sheet(summary, [34, 24])
+
+    bookings = workbook.create_sheet("Combined Bookings")
+    headers = ["Project", "Reference", "Status", "Differences", "System A Company", "System B Company"]
+    if mode == "detailed":
+        headers.extend(["System A Trip", "System B Trip", "System A Hotel or Pickup", "System B Hotel or Pickup"])
+    headers.extend(["System A Amount", "System B Amount", "Variance"])
+    bookings.append(headers)
+    for row in data["rows"]:
+        left, right = row.get("system_a") or {}, row.get("system_b") or {}
+        values = [
+            excel_safe(row["project_name"]), excel_safe(row["reference"]), row["status_label"],
+            ", ".join(row["differences"]) or "None", excel_safe(left.get("company", "")),
+            excel_safe(right.get("company", "")),
+        ]
+        if mode == "detailed":
+            values.extend([
+                excel_safe(left.get("service", "")), excel_safe(right.get("service", "")),
+                excel_safe(left.get("pickup", "")), excel_safe(right.get("pickup", "")),
+            ])
+        values.extend([left.get("amount", 0), right.get("amount", 0), row["amount_variance"]])
+        bookings.append(values)
+    format_export_sheet(bookings, [28, 18, 22, 34, 26, 26] + ([22, 22, 26, 26] if mode == "detailed" else []) + [18, 18, 18])
+
+    ledger = workbook.create_sheet("Financial Movements")
+    ledger.append(["Adjustment UTC", "Project", "Reference", "Source", "Before", "After", "Movement", "Action"])
+    for row in data["movements"]:
+        ledger.append([
+            row["occurred_at"], excel_safe(row["project_name"]), excel_safe(row["reference"]),
+            "System A" if row["side"] == "system_a" else "System B", row["before_amount"],
+            row["after_amount"], row["movement"], row["action"],
+        ])
+    format_export_sheet(ledger, [24, 28, 18, 14, 16, 16, 16, 28])
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return send_file(
+        output, as_attachment=True, download_name=f"reconcileflow-{mode}-combined-projects.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.post("/projects/<run_id>/adjustment")
+def adjust_project_amount(run_id):
+    reference = request.form.get("reference", "").strip()
+    side = request.form.get("side", "").strip().lower()
+    if side not in {"system_a", "system_b"} or not reference:
+        return jsonify({"ok": False, "error": "Invalid booking adjustment."}), 400
+    try:
+        after_amount = round(float(request.form.get("amount", "")), 2)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Amount must be numeric."}), 400
+    if not math.isfinite(after_amount) or after_amount < 0 or after_amount > 1_000_000_000:
+        return jsonify({"ok": False, "error": "Amount is outside the accepted range."}), 400
+
+    occurred_at = datetime.now(timezone.utc).isoformat()
+    with database() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        record = connection.execute("SELECT * FROM demo_runs WHERE id=?", (run_id,)).fetchone()
+        if not record:
+            abort(404)
+        payload = json.loads(record["payload_json"])
+        result = next((row for row in payload["results"] if row["reference"] == reference), None)
+        source = result.get(side) if result else None
+        if source is None:
+            return jsonify({"ok": False, "error": "The selected source has no booking to adjust."}), 400
+        before_amount = round(float(source.get("amount", 0)), 2)
+        if before_amount == after_amount:
+            return jsonify({"ok": False, "error": "Enter an amount different from the current value."}), 400
+        source["amount"] = after_amount
+        if record["mode"] == "detailed":
+            source["pricing_variance"] = round(after_amount - float(source.get("calculated_amount", 0)), 2)
+        recalculate_payload(payload, record["mode"])
+        movement = round(before_amount - after_amount, 2)
+        action = f"{'System A' if side == 'system_a' else 'System B'} amount adjusted"
+        connection.execute(
+            "UPDATE demo_runs SET payload_json=? WHERE id=?",
+            (json.dumps(payload, separators=(",", ":")), run_id),
+        )
+        cursor = connection.execute(
+            """INSERT INTO financial_movements(
+                   run_id,mode,occurred_at,reference,side,before_amount,after_amount,movement,action
+               ) VALUES(?,?,?,?,?,?,?,?,?)""",
+            (run_id, record["mode"], occurred_at, reference, side, before_amount, after_amount, movement, action),
+        )
+
+    return jsonify({
+        "ok": True,
+        "movement": {
+            "id": cursor.lastrowid, "occurred_at": occurred_at, "reference": reference,
+            "side": side, "before": before_amount, "after": after_amount,
+            "movement": movement, "action": action, "project": record["project_name"],
+        },
+        "row": {
+            "status": result["status"], "status_label": result["status_label"],
+            "differences": result["differences"], "amount_variance": result["amount_variance"],
+        },
+        "summary": payload["summary"],
+    })
 
 
 @app.get("/invoice-tracking")

@@ -36,6 +36,20 @@ def test_hub_exposes_all_three_workflows_and_report_workshop(client):
     assert response.status_code == 200
     for label in (b"Standard Reconciliation", b"Detailed Reconciliation", b"Invoice Tracking", b"Report Workshop"):
         assert label in response.data
+    assert b"Try the live standard demo" in response.data
+    assert b"Try the live detailed demo" in response.data
+
+
+def test_hr_live_demo_links_open_ready_combined_workspaces(client):
+    standard = client.get("/try/standard", follow_redirects=True)
+    assert standard.status_code == 200
+    assert b"Projects operating as one reconciliation workspace" in standard.data
+    assert b"May 2026 marine operations" in standard.data
+    assert b"June 2026 marine operations" in standard.data
+    detailed = client.get("/try/detailed", follow_redirects=True)
+    assert detailed.status_code == 200
+    assert b"Hotel or pickup A / B" in detailed.data
+    assert client.get("/try/unsupported").status_code == 404
 
 
 def test_complete_demo_workflow_and_export(client):
@@ -107,6 +121,21 @@ def test_unknown_result_is_404(client):
     assert client.get("/results/unknown").status_code == 404
 
 
+def test_language_switch_persists_and_rejects_open_redirects(client):
+    response = client.get("/language/ar?next=/detailed", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/detailed")
+    page = client.get("/detailed")
+    assert b'<html lang="ar" dir="rtl">' in page.data
+    assert b'/static/i18n.js' in page.data
+
+    unsafe = client.get("/language/en?next=https://example.com", follow_redirects=False)
+    assert unsafe.headers["Location"].endswith("/")
+    unsafe_backslash = client.get("/language/en?next=/\\example.com", follow_redirects=False)
+    assert unsafe_backslash.headers["Location"].endswith("/")
+    assert client.get("/language/fr").status_code == 404
+
+
 def test_detailed_demo_and_export(client):
     response = client.post("/detailed/demo", data={"csrf_token": csrf(client)}, follow_redirects=False)
     assert response.status_code == 302
@@ -161,6 +190,107 @@ def test_operations_control_center_views_and_export(client):
     assert workbook["Settlement Ledger"].max_row == 6
     assert workbook["No Shows"]["H5"].value == 210
     workbook.close()
+
+
+def test_standard_projects_combine_and_adjustments_are_audited(client):
+    library = client.get("/standard")
+    assert library.status_code == 200
+    assert b"Monthly reconciliation projects" in library.data
+    assert b"portfolio-standard-may" in library.data
+
+    combined = client.get(
+        "/projects/standard/combined?project=portfolio-standard-may&project=portfolio-standard-june"
+    )
+    assert combined.status_code == 200
+    assert b"Projects operating as one reconciliation workspace" in combined.data
+    assert b"May 2026 marine operations" in combined.data
+    assert b"June 2026 marine operations" in combined.data
+
+    first = client.post(
+        "/projects/portfolio-standard-may/adjustment",
+        data={"csrf_token": csrf(client), "reference": "RF-1001", "side": "system_a", "amount": "200"},
+    )
+    assert first.status_code == 200
+    assert first.json["movement"]["before"] == 250
+    assert first.json["movement"]["after"] == 200
+    assert first.json["movement"]["movement"] == 50
+    assert first.json["row"]["amount_variance"] == -50
+    assert first.json["summary"]["matched"] == 1
+    assert first.json["summary"]["amount_variance"] == 100
+
+    second = client.post(
+        "/projects/portfolio-standard-may/adjustment",
+        data={"csrf_token": csrf(client), "reference": "RF-1001", "side": "system_a", "amount": "230"},
+    )
+    assert second.status_code == 200
+    assert second.json["movement"]["movement"] == -30
+    assert second.json["summary"]["amount_variance"] == 130
+    with app_module.database() as connection:
+        total = connection.execute(
+            "SELECT ROUND(SUM(movement), 2) AS total FROM financial_movements WHERE run_id=?",
+            ("portfolio-standard-may",),
+        ).fetchone()["total"]
+        count = connection.execute(
+            "SELECT COUNT(*) AS count FROM financial_movements WHERE run_id=?",
+            ("portfolio-standard-may",),
+        ).fetchone()["count"]
+    assert total == 20
+    assert count == 2
+    missing_source = client.post(
+        "/projects/portfolio-standard-may/adjustment",
+        data={"csrf_token": csrf(client), "reference": "RF-1007", "side": "system_b", "amount": "10"},
+    )
+    assert missing_source.status_code == 400
+    assert len(app_module.movement_rows(["portfolio-standard-may"])) == 2
+    run = app_module.get_run("portfolio-standard-may")
+    adjusted = next(row for row in run["results"] if row["reference"] == "RF-1001")
+    assert adjusted["system_a"]["amount"] == 230
+    assert adjusted["amount_variance"] == -20
+    export = client.get(
+        "/projects/standard/combined/export.xlsx?project=portfolio-standard-may&project=portfolio-standard-june"
+    )
+    assert export.status_code == 200
+    workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
+    assert workbook.sheetnames == ["Combined Summary", "Combined Bookings", "Financial Movements"]
+    assert workbook["Combined Bookings"].max_row == 27
+    assert workbook["Financial Movements"].max_row == 3
+    assert workbook["Combined Summary"]["B6"].value == 20
+    workbook.close()
+
+
+def test_detailed_projects_adjust_pricing_and_reject_invalid_edits(client):
+    assert client.get("/detailed").status_code == 200
+    run = app_module.get_run("portfolio-detailed-may")
+    row = next(item for item in run["results"] if item.get("system_a"))
+    reference = row["reference"]
+    source = row["system_a"]
+    target = source["amount"] + 15
+    response = client.post(
+        "/projects/portfolio-detailed-may/adjustment",
+        data={"csrf_token": csrf(client), "reference": reference, "side": "system_a", "amount": str(target)},
+    )
+    assert response.status_code == 200
+    updated = app_module.get_run("portfolio-detailed-may")
+    updated_row = next(item for item in updated["results"] if item["reference"] == reference)
+    assert updated_row["system_a"]["pricing_variance"] == round(
+        target - updated_row["system_a"]["calculated_amount"], 2
+    )
+    assert updated["summary"]["pricing_variance_a"] == round(sum(
+        (item.get("system_a") or {}).get("pricing_variance", 0) for item in updated["results"]
+    ), 2)
+
+    movement_count = len(app_module.movement_rows(["portfolio-detailed-may"]))
+    unchanged = client.post(
+        "/projects/portfolio-detailed-may/adjustment",
+        data={"csrf_token": csrf(client), "reference": reference, "side": "system_a", "amount": str(target)},
+    )
+    assert unchanged.status_code == 400
+    assert len(app_module.movement_rows(["portfolio-detailed-may"])) == movement_count
+    invalid = client.post(
+        "/projects/portfolio-detailed-may/adjustment",
+        data={"csrf_token": csrf(client), "reference": reference, "side": "system_a", "amount": "-1"},
+    )
+    assert invalid.status_code == 400
 
 
 import pytest

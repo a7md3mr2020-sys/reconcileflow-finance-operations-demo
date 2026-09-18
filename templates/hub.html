@@ -2,9 +2,13 @@
 {% block title %}ReconcileFlow | Finance Control Portfolio{% endblock %}
 {% block content %}
 <section class="hub-hero">
-  <p class="eyebrow">FINANCE OPERATIONS PRODUCT CASE STUDY</p>
-  <h1>Three control workflows. One reconciliation platform.</h1>
-  <p class="lead">A portfolio-safe demonstration of a broader marine-tour finance system built around operational reconciliation, detailed pricing control, invoice follow-up, and configurable reporting.</p>
+  <div class="hub-hero-copy">
+    <p class="eyebrow">FINANCE OPERATIONS PRODUCT CASE STUDY</p>
+    <h1>Three control workflows. One reconciliation platform.</h1>
+    <p class="lead">A working marine-tour finance demo for reconciliation, pricing control, invoice follow-up, and configurable reporting.</p>
+    <div class="hub-actions"><a class="button button-primary" href="{{ url_for('try_live_demo', mode='standard') }}">Try the live standard demo</a><a class="button button-secondary" href="{{ url_for('try_live_demo', mode='detailed') }}">Try the live detailed demo</a></div>
+  </div>
+  <div class="demo-proof" aria-label="Live demo details"><div><strong>No login</strong><span>Open and interact immediately</span></div><div><strong>Synthetic data</strong><span>Safe public portfolio records</span></div><div><strong>60-second review</strong><span>Projects, edits, filters, and audit trail</span></div></div>
 </section>
 
 <section class="mode-grid" aria-label="Choose a workflow">

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% set is_detailed = workspace.mode == 'detailed' %}
+{% block title %}Combined Projects | ReconcileFlow{% endblock %}
+{% block content %}
+<section class="result-header combined-header">
+  <div>
+    <a class="back-link" href="{{ url_for('detailed_workspace' if is_detailed else 'index') }}">Back to project library</a>
+    <p class="eyebrow">{{ 'DETAILED' if is_detailed else 'STANDARD' }} / COMBINED WORKSPACE</p>
+    <h1>Projects operating as one reconciliation workspace</h1>
+    <p class="timestamp">Every adjustment remains attached to its original project and booking reference.</p>
+  </div>
+  <div class="combined-header-actions">
+    <div class="project-pills">{% for project in workspace.projects %}<span>{{ project.project_name }}</span>{% endfor %}</div>
+    <a class="button button-primary" href="{{ url_for('combined_projects_export', mode=workspace.mode, project=workspace.projects|map(attribute='id')|list) }}">Export combined workbook</a>
+  </div>
+</section>
+
+<section class="kpi-grid combined-kpis" aria-label="Combined project summary">
+  <article class="kpi kpi-feature"><span>Open projects</span><strong>{{ workspace.summary.projects }}</strong><small>Working together in this view</small></article>
+  <article class="kpi"><span>Total references</span><strong>{{ workspace.summary.references }}</strong><small>Rows retain project ownership</small></article>
+  <article class="kpi"><span>Exact matches</span><strong data-combined-matched>{{ workspace.summary.matched }}</strong><small>Recalculated after every edit</small></article>
+  <article class="kpi"><span>Amount variance</span><strong data-combined-variance>{{ "{:,.2f}".format(workspace.summary.amount_variance) }}</strong><small>System A minus System B</small></article>
+  <article class="kpi"><span>Settlement movement</span><strong data-combined-movement>{{ "{:,.2f}".format(workspace.summary.movement_total) }}</strong><small>Decrease positive, increase negative</small></article>
+</section>
+
+<nav class="view-tabs combined-tabs">
+  <a href="#combined-bookings">Combined bookings</a>
+  <a href="#movement-ledger">Financial movement ledger</a>
+</nav>
+
+<section class="data-section" id="combined-bookings">
+  <div class="section-heading">
+    <div><p class="eyebrow">LIVE MULTI-PROJECT CONTROL</p><h2>Bookings from the selected projects</h2></div>
+    <span class="visible-counter"><strong data-visible-count>{{ workspace.rows|length }}</strong> visible</span>
+  </div>
+  <div class="table-toolbar" data-table-controls="combined-bookings-table">
+    <label class="search-field"><span>Search</span><input type="search" placeholder="Project, reference, company, service..." data-table-search></label>
+    <label class="select-field"><span>Status</span><select data-table-status><option value="">All statuses</option><option value="matched">Matched</option><option value="mismatch">Mismatch</option><option value="missing_a">Missing in System A</option><option value="missing_b">Missing in System B</option><option value="duplicate">Duplicate detected</option></select></label>
+  </div>
+  <p class="table-note">Amount edits are saved immediately and recorded in the financial movement ledger below.</p>
+  <div class="table-wrap">
+    <table id="combined-bookings-table" data-filter-table>
+      <thead><tr><th>Project</th><th>Reference</th><th>Status</th><th>Differences</th><th>System A company</th><th>System B company</th>{% if is_detailed %}<th>Trip A / B</th><th>Hotel or pickup A / B</th>{% endif %}<th class="number">System A amount</th><th class="number">System B amount</th><th class="number">Variance</th></tr></thead>
+      <tbody>
+      {% for row in workspace.rows %}{% set a = row.system_a or {} %}{% set b = row.system_b or {} %}
+        <tr data-status="{{ row.status }}" data-project-id="{{ row.project_id }}" data-reference="{{ row.reference }}">
+          <td><strong>{{ row.project_name }}</strong></td>
+          <td class="reference">{{ row.reference }}</td>
+          <td><span class="status status-{{ row.status }}" data-row-status>{{ row.status_label }}</span></td>
+          <td data-row-differences>{{ row.differences|join(', ') if row.differences else 'None' }}</td>
+          <td>{{ a.company or 'Not present' }}</td><td>{{ b.company or 'Not present' }}</td>
+          {% if is_detailed %}<td>{{ a.service or 'Not present' }} / {{ b.service or 'Not present' }}</td><td>{{ a.pickup or 'No transfer' }} / {{ b.pickup or 'No transfer' }}</td>{% endif %}
+          <td class="number">
+            {% if row.system_a %}<form class="amount-edit" action="{{ url_for('adjust_project_amount', run_id=row.project_id) }}" method="post" data-amount-form data-side="system_a"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="reference" value="{{ row.reference }}"><input type="hidden" name="side" value="system_a"><input name="amount" type="number" min="0" max="1000000000" step="0.01" value="{{ '%.2f'|format(a.amount) }}" aria-label="System A amount"><button type="submit">Save</button></form>{% else %}<span class="not-present">Not present</span>{% endif %}
+          </td>
+          <td class="number">
+            {% if row.system_b %}<form class="amount-edit" action="{{ url_for('adjust_project_amount', run_id=row.project_id) }}" method="post" data-amount-form data-side="system_b"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="reference" value="{{ row.reference }}"><input type="hidden" name="side" value="system_b"><input name="amount" type="number" min="0" max="1000000000" step="0.01" value="{{ '%.2f'|format(b.amount) }}" aria-label="System B amount"><button type="submit">Save</button></form>{% else %}<span class="not-present">Not present</span>{% endif %}
+          </td>
+          <td class="number variance {{ 'negative' if row.amount_variance < 0 else 'positive' if row.amount_variance > 0 else '' }}" data-row-variance data-value="{{ row.amount_variance }}">{{ "{:,.2f}".format(row.amount_variance) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="data-section movement-section" id="movement-ledger">
+  <div class="section-heading"><div><p class="eyebrow">AUDITABLE SETTLEMENTS</p><h2>Financial movement ledger</h2></div><span class="visible-counter"><strong data-visible-count>{{ workspace.movements|length }}</strong> movements</span></div>
+  <div class="table-toolbar" data-table-controls="workspace-movement-table">
+    <label class="search-field"><span>Search</span><input type="search" placeholder="Project, reference, action..." data-table-search></label>
+    <label class="select-field"><span>Source</span><select data-table-status><option value="">All sources</option><option value="system_a">System A</option><option value="system_b">System B</option></select></label>
+  </div>
+  <div class="table-wrap">
+    <table id="workspace-movement-table" data-filter-table data-sum-column="6">
+      <thead><tr><th>Adjustment time</th><th>Project</th><th>Reference</th><th>Source</th><th class="number">Before</th><th class="number">After</th><th class="number">Movement</th><th>Action</th></tr></thead>
+      <tbody data-movement-body>
+      {% for row in workspace.movements %}<tr data-status="{{ row.side }}"><td>{{ row.occurred_at[:16]|replace('T', ' ') }}</td><td>{{ row.project_name }}</td><td class="reference">{{ row.reference }}</td><td>{{ 'System A' if row.side == 'system_a' else 'System B' }}</td><td class="number">{{ "{:,.2f}".format(row.before_amount) }}</td><td class="number">{{ "{:,.2f}".format(row.after_amount) }}</td><td class="number variance {{ 'positive' if row.movement > 0 else 'negative' if row.movement < 0 else '' }}" data-value="{{ row.movement }}">{{ "{:,.2f}".format(row.movement) }}</td><td>{{ row.action }}</td></tr>{% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="6">Filtered movement total</td><td class="number" data-filter-total>{{ "{:,.2f}".format(workspace.summary.movement_total) }}</td><td></td></tr></tfoot>
+    </table>
+  </div>
+</section>
+{% endblock %}

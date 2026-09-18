@@ -4,17 +4,25 @@
 
 ReconcileFlow is a portfolio-safe product case study built from three connected finance workflows: standard booking reconciliation, detailed pricing reconciliation, and invoice follow-up. A signature Report Workshop turns filtered operational evidence into a configurable professional report. The repository contains only synthetic records and generic organization names.
 
+The complete runtime interface is available in English and Arabic. The language switch persists across navigation and changes page direction, workflow navigation, tabs, filters, table headings, statuses, dashboards, and report controls together.
+
 ![ReconcileFlow workflow hub](docs/screenshots/hub.png)
 
 ## Three product paths
 
 ### 1. Standard Reconciliation
 
-Compare references, dates, companies, services, passenger categories, and amounts. Review missing records, duplicates, company-name mappings, field-level exceptions, and a complete three-sheet Excel export.
+Work through a library of monthly reconciliation projects. Compare references, dates, companies, services, passenger categories, and amounts, then select several projects and open them as one editable workspace without losing source-project ownership.
 
 ### 2. Detailed Reconciliation
 
-Extend the control into trip type, hotel or pickup, transfer state, adult rate, chargeable passengers, calculated amount, and pricing variance. The child is valued at half the adult rate and the infant has zero cost. If rate or amount is missing, the available value and chargeable passenger count derive it. A separate reference view uses the reference number as its independent key.
+Use the same project model while extending the control into trip type, hotel or pickup, transfer state, adult rate, chargeable passengers, calculated amount, and pricing variance. The child is valued at half the adult rate and the infant has zero cost. If rate or amount is missing, the available value and chargeable passenger count derive it.
+
+## Multi-project workspace and financial movements
+
+Standard and detailed reconciliation each expose a project library with synthetic monthly periods. Any selection can operate as one workspace while every booking retains its original project and reference. Amount adjustments are saved without a page reload, immediately recalculate the affected row and project totals, and post an immutable financial movement containing source, value before, value after, and movement (`before - after`). Consecutive adjustments therefore telescope to the exact net impact instead of double-counting activity.
+
+The combined Excel export contains a summary, every booking from the selected projects, and the complete financial movement ledger.
 
 ### 3. Invoice Tracking
 
@@ -103,6 +111,11 @@ See [Reconciliation logic](docs/RECONCILIATION_LOGIC.md) for definitions and lim
 ## Features
 
 - One-click synthetic demonstration with no setup data.
+- Persistent English/Arabic runtime interface with complete LTR/RTL adaptation across all three product paths.
+- Project libraries for both standard and detailed reconciliation.
+- Multi-project workspaces that retain source-project ownership for every booking.
+- Atomic amount adjustments with recalculated variances and a filter-aware financial movement ledger.
+- Combined-project Excel export with summary, bookings, and movements.
 - XLSX and CSV upload for System A and System B.
 - Header validation and readable row-level validation errors.
 - Unicode, whitespace, punctuation, date, and numeric normalization.
@@ -197,8 +210,8 @@ The demo does not save uploaded workbooks. It stores normalized reconciliation o
 portfolio-demo/
 |-- app.py
 |-- reconcileflow/          # reconciliation engines and synthetic control-center data
-|-- templates/              # English server-rendered interface
-|-- static/                 # responsive visual system and table filtering
+|-- templates/              # semantic server-rendered interface
+|-- static/                 # responsive UI, bilingual runtime, and table filtering
 |-- sample-data/            # synthetic XLSX examples
 |-- tests/                  # engine and end-to-end Flask tests
 |-- scripts/                # sample-data generator and security gate
