@@ -64,12 +64,16 @@ def init_database():
                    project_name TEXT NOT NULL,
                    payload_json TEXT NOT NULL,
                    mode TEXT NOT NULL DEFAULT 'standard',
+                   owner_id TEXT NOT NULL DEFAULT '',
                    created_at TEXT NOT NULL
                )"""
         )
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(demo_runs)")}
         if "mode" not in columns:
             connection.execute("ALTER TABLE demo_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'standard'")
+        if "owner_id" not in columns:
+            connection.execute("ALTER TABLE demo_runs ADD COLUMN owner_id TEXT NOT NULL DEFAULT ''")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_owner ON demo_runs(owner_id, mode)")
         connection.execute(
             "UPDATE demo_runs SET mode='detailed' WHERE mode='standard' AND LOWER(project_name) LIKE '%detailed%'"
         )
@@ -92,16 +96,27 @@ def init_database():
         )
 
 
+def visitor_id():
+    if "visitor_id" not in session:
+        session["visitor_id"] = uuid4().hex
+    return session["visitor_id"]
+
+
+def sample_project_id(mode, month):
+    return f"portfolio-{mode}-{month}-{visitor_id()}"
+
+
 def store_run(project_name, payload, mode="standard", run_id=None):
     if mode not in {"standard", "detailed"}:
         raise ValueError("Unsupported reconciliation mode.")
     run_id = run_id or uuid4().hex
     with database() as connection:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
-        connection.execute("DELETE FROM demo_runs WHERE created_at < ? AND id NOT LIKE 'portfolio-%'", (cutoff,))
+        connection.execute("DELETE FROM financial_movements WHERE run_id IN (SELECT id FROM demo_runs WHERE created_at < ?)", (cutoff,))
+        connection.execute("DELETE FROM demo_runs WHERE created_at < ?", (cutoff,))
         connection.execute(
-            "INSERT INTO demo_runs(id,project_name,payload_json,mode,created_at) VALUES(?,?,?,?,?)",
-            (run_id, project_name[:120], json.dumps(payload, separators=(",", ":")), mode, datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO demo_runs(id,project_name,payload_json,mode,owner_id,created_at) VALUES(?,?,?,?,?,?)",
+            (run_id, project_name[:120], json.dumps(payload, separators=(",", ":")), mode, visitor_id(), datetime.now(timezone.utc).isoformat()),
         )
     return run_id
 
@@ -109,8 +124,9 @@ def store_run(project_name, payload, mode="standard", run_id=None):
 def get_run(run_id):
     with database() as connection:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
-        connection.execute("DELETE FROM demo_runs WHERE created_at < ? AND id NOT LIKE 'portfolio-%'", (cutoff,))
-        row = connection.execute("SELECT * FROM demo_runs WHERE id=?", (run_id,)).fetchone()
+        connection.execute("DELETE FROM financial_movements WHERE run_id IN (SELECT id FROM demo_runs WHERE created_at < ?)", (cutoff,))
+        connection.execute("DELETE FROM demo_runs WHERE created_at < ?", (cutoff,))
+        row = connection.execute("SELECT * FROM demo_runs WHERE id=? AND owner_id=?", (run_id, visitor_id())).fetchone()
     if not row:
         return None
     return {
@@ -168,9 +184,10 @@ def recalculate_payload(payload, mode):
 def list_projects(mode):
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
     with database() as connection:
-        connection.execute("DELETE FROM demo_runs WHERE created_at < ? AND id NOT LIKE 'portfolio-%'", (cutoff,))
+        connection.execute("DELETE FROM financial_movements WHERE run_id IN (SELECT id FROM demo_runs WHERE created_at < ?)", (cutoff,))
+        connection.execute("DELETE FROM demo_runs WHERE created_at < ?", (cutoff,))
         rows = connection.execute(
-            "SELECT * FROM demo_runs WHERE mode=? ORDER BY created_at DESC, project_name", (mode,)
+            "SELECT * FROM demo_runs WHERE mode=? AND owner_id=? ORDER BY created_at DESC, project_name", (mode, visitor_id())
         ).fetchall()
         movement_totals = {
             row["run_id"]: row["total"] for row in connection.execute(
@@ -194,11 +211,10 @@ def ensure_sample_projects(mode):
         ("june", "June 2026 marine operations", 25),
         ("july", "July 2026 marine operations", -40),
     )
-    prefix = "standard" if mode == "standard" else "detailed"
     with database() as connection:
-        existing = {row["id"] for row in connection.execute("SELECT id FROM demo_runs WHERE mode=?", (mode,))}
+        existing = {row["id"] for row in connection.execute("SELECT id FROM demo_runs WHERE mode=? AND owner_id=?", (mode, visitor_id()))}
     for month, name, delta in definitions:
-        run_id = f"portfolio-{prefix}-{month}"
+        run_id = sample_project_id(mode, month)
         if run_id in existing:
             continue
         payload = reconcile(records(SYSTEM_A), records(SYSTEM_B)) if mode == "standard" else reconcile_detailed(
@@ -371,10 +387,9 @@ def try_live_demo(mode):
     if mode not in {"standard", "detailed"}:
         abort(404)
     ensure_sample_projects(mode)
-    prefix = "standard" if mode == "standard" else "detailed"
     return redirect(url_for(
         "combined_projects", mode=mode,
-        project=[f"portfolio-{prefix}-may", f"portfolio-{prefix}-june"],
+        project=[sample_project_id(mode, "may"), sample_project_id(mode, "june")],
     ))
 
 
@@ -705,7 +720,7 @@ def adjust_project_amount(run_id):
     occurred_at = datetime.now(timezone.utc).isoformat()
     with database() as connection:
         connection.execute("BEGIN IMMEDIATE")
-        record = connection.execute("SELECT * FROM demo_runs WHERE id=?", (run_id,)).fetchone()
+        record = connection.execute("SELECT * FROM demo_runs WHERE id=? AND owner_id=?", (run_id, visitor_id())).fetchone()
         if not record:
             abort(404)
         payload = json.loads(record["payload_json"])

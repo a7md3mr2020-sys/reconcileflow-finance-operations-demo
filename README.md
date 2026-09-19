@@ -10,7 +10,7 @@ The complete runtime interface is available in English and Arabic. The language 
 
 **[Open the HR-ready live product](https://reconcileflow-finance-operations-de.vercel.app/)**
 
-No login is required and every record is synthetic. For a focused review, open a ready multi-project workspace directly:
+No login is required and every record is synthetic. Each visitor receives an isolated set of demo projects and financial movements; demo records expire after 24 hours by default. For a focused review, open a ready multi-project workspace directly:
 
 - [Try Standard Reconciliation](https://reconcileflow-finance-operations-de.vercel.app/try/standard)
 - [Try Detailed Reconciliation](https://reconcileflow-finance-operations-de.vercel.app/try/detailed)

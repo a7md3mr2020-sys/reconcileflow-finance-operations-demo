@@ -32,6 +32,11 @@ def csrf(client):
     return "test-token"
 
 
+def sample_id(client, mode, month):
+    with client.session_transaction() as state:
+        return f"portfolio-{mode}-{month}-{state['visitor_id']}"
+
+
 def workbook_bytes(rows):
     workbook = Workbook()
     sheet = workbook.active
@@ -216,10 +221,12 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     library = client.get("/standard")
     assert library.status_code == 200
     assert b"Monthly reconciliation projects" in library.data
-    assert b"portfolio-standard-may" in library.data
+    may_id = sample_id(client, "standard", "may")
+    june_id = sample_id(client, "standard", "june")
+    assert may_id.encode() in library.data
 
     combined = client.get(
-        "/projects/standard/combined?project=portfolio-standard-may&project=portfolio-standard-june"
+        f"/projects/standard/combined?project={may_id}&project={june_id}"
     )
     assert combined.status_code == 200
     assert b"Projects operating as one reconciliation workspace" in combined.data
@@ -227,7 +234,7 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     assert b"June 2026 marine operations" in combined.data
 
     first = client.post(
-        "/projects/portfolio-standard-may/adjustment",
+        f"/projects/{may_id}/adjustment",
         data={"csrf_token": csrf(client), "reference": "RF-1001", "side": "system_a", "amount": "200"},
     )
     assert first.status_code == 200
@@ -239,7 +246,7 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     assert first.json["summary"]["amount_variance"] == 100
 
     second = client.post(
-        "/projects/portfolio-standard-may/adjustment",
+        f"/projects/{may_id}/adjustment",
         data={"csrf_token": csrf(client), "reference": "RF-1001", "side": "system_a", "amount": "230"},
     )
     assert second.status_code == 200
@@ -248,26 +255,29 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     with app_module.database() as connection:
         total = connection.execute(
             "SELECT ROUND(SUM(movement), 2) AS total FROM financial_movements WHERE run_id=?",
-            ("portfolio-standard-may",),
+            (may_id,),
         ).fetchone()["total"]
         count = connection.execute(
             "SELECT COUNT(*) AS count FROM financial_movements WHERE run_id=?",
-            ("portfolio-standard-may",),
+            (may_id,),
         ).fetchone()["count"]
     assert total == 20
     assert count == 2
     missing_source = client.post(
-        "/projects/portfolio-standard-may/adjustment",
+        f"/projects/{may_id}/adjustment",
         data={"csrf_token": csrf(client), "reference": "RF-1007", "side": "system_b", "amount": "10"},
     )
     assert missing_source.status_code == 400
-    assert len(app_module.movement_rows(["portfolio-standard-may"])) == 2
-    run = app_module.get_run("portfolio-standard-may")
+    assert len(app_module.movement_rows([may_id])) == 2
+    with app_module.app.test_request_context():
+        with client.session_transaction() as state:
+            app_module.session.update(state)
+        run = app_module.get_run(may_id)
     adjusted = next(row for row in run["results"] if row["reference"] == "RF-1001")
     assert adjusted["system_a"]["amount"] == 230
     assert adjusted["amount_variance"] == -20
     export = client.get(
-        "/projects/standard/combined/export.xlsx?project=portfolio-standard-may&project=portfolio-standard-june"
+        f"/projects/standard/combined/export.xlsx?project={may_id}&project={june_id}"
     )
     assert export.status_code == 200
     workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
@@ -280,17 +290,24 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
 
 def test_detailed_projects_adjust_pricing_and_reject_invalid_edits(client):
     assert client.get("/detailed").status_code == 200
-    run = app_module.get_run("portfolio-detailed-may")
+    may_id = sample_id(client, "detailed", "may")
+    with app_module.app.test_request_context():
+        with client.session_transaction() as state:
+            app_module.session.update(state)
+        run = app_module.get_run(may_id)
     row = next(item for item in run["results"] if item.get("system_a"))
     reference = row["reference"]
     source = row["system_a"]
     target = source["amount"] + 15
     response = client.post(
-        "/projects/portfolio-detailed-may/adjustment",
+        f"/projects/{may_id}/adjustment",
         data={"csrf_token": csrf(client), "reference": reference, "side": "system_a", "amount": str(target)},
     )
     assert response.status_code == 200
-    updated = app_module.get_run("portfolio-detailed-may")
+    with app_module.app.test_request_context():
+        with client.session_transaction() as state:
+            app_module.session.update(state)
+        updated = app_module.get_run(may_id)
     updated_row = next(item for item in updated["results"] if item["reference"] == reference)
     assert updated_row["system_a"]["pricing_variance"] == round(
         target - updated_row["system_a"]["calculated_amount"], 2
@@ -299,18 +316,51 @@ def test_detailed_projects_adjust_pricing_and_reject_invalid_edits(client):
         (item.get("system_a") or {}).get("pricing_variance", 0) for item in updated["results"]
     ), 2)
 
-    movement_count = len(app_module.movement_rows(["portfolio-detailed-may"]))
+    movement_count = len(app_module.movement_rows([may_id]))
     unchanged = client.post(
-        "/projects/portfolio-detailed-may/adjustment",
+        f"/projects/{may_id}/adjustment",
         data={"csrf_token": csrf(client), "reference": reference, "side": "system_a", "amount": str(target)},
     )
     assert unchanged.status_code == 400
-    assert len(app_module.movement_rows(["portfolio-detailed-may"])) == movement_count
+    assert len(app_module.movement_rows([may_id])) == movement_count
     invalid = client.post(
-        "/projects/portfolio-detailed-may/adjustment",
+        f"/projects/{may_id}/adjustment",
         data={"csrf_token": csrf(client), "reference": reference, "side": "system_a", "amount": "-1"},
     )
     assert invalid.status_code == 400
+
+
+def test_public_demo_projects_and_adjustments_are_isolated_between_visitors(client):
+    first = client
+    second = app_module.app.test_client()
+    assert first.get("/standard").status_code == 200
+    first_may = sample_id(first, "standard", "may")
+    assert second.get("/standard").status_code == 200
+    second_may = sample_id(second, "standard", "may")
+    assert first_may != second_may
+
+    response = first.post(
+        f"/projects/{first_may}/adjustment",
+        data={"csrf_token": csrf(first), "reference": "RF-1001", "side": "system_a", "amount": "200"},
+    )
+    assert response.status_code == 200
+    assert second.get(f"/projects/standard/combined?project={first_may}").status_code == 302
+    assert second.get(f"/projects/standard/combined/export.xlsx?project={first_may}").status_code == 404
+    assert second.get(f"/results/{first_may}").status_code == 404
+    assert second.post(
+        f"/projects/{first_may}/adjustment",
+        data={"csrf_token": csrf(second), "reference": "RF-1001", "side": "system_a", "amount": "190"},
+    ).status_code == 404
+
+    second_workspace = second.get(f"/projects/standard/combined?project={second_may}")
+    assert second_workspace.status_code == 200
+    with app_module.app.test_request_context():
+        with second.session_transaction() as state:
+            app_module.session.update(state)
+        second_run = app_module.get_run(second_may)
+    row = next(row for row in second_run["results"] if row["reference"] == "RF-1001")
+    assert row["system_a"]["amount"] == 250
+    assert app_module.movement_rows([second_may]) == []
 
 
 import pytest
