@@ -235,7 +235,15 @@ def ensure_sample_projects(mode):
 def selected_projects(mode, project_ids):
     unique_ids = list(dict.fromkeys(project_ids))[:12]
     projects = []
+    resolved_ids = set()
     for run_id in unique_ids:
+        for month in ("may", "june", "july"):
+            if run_id == f"portfolio-{mode}-{month}":
+                run_id = sample_project_id(mode, month)
+                break
+        if run_id in resolved_ids:
+            continue
+        resolved_ids.add(run_id)
         run = get_run(run_id)
         if run and run["mode"] == mode:
             projects.append(run)
@@ -645,6 +653,7 @@ def combined_projects(mode):
 def combined_projects_export(mode):
     if mode not in {"standard", "detailed"}:
         abort(404)
+    ensure_sample_projects(mode)
     projects = selected_projects(mode, request.args.getlist("project"))
     if not projects:
         abort(404)

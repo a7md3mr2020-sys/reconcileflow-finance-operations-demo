@@ -363,6 +363,23 @@ def test_public_demo_projects_and_adjustments_are_isolated_between_visitors(clie
     assert app_module.movement_rows([second_may]) == []
 
 
+def test_legacy_sample_links_open_in_current_visitors_workspace(client):
+    for mode in ("standard", "detailed"):
+        legacy = f"/projects/{mode}/combined?project=portfolio-{mode}-may&project=portfolio-{mode}-june"
+        page = client.get(legacy)
+        assert page.status_code == 200
+        assert b"May 2026 marine operations" in page.data
+        assert b"June 2026 marine operations" in page.data
+        current_may = sample_id(client, mode, "may")
+        assert current_may.encode() in page.data
+        assert client.get(legacy.replace("/combined?", "/combined/export.xlsx?")).status_code == 200
+
+        duplicate = client.get(f"/projects/{mode}/combined?project=portfolio-{mode}-may&project={current_may}")
+        assert b"<span>Open projects</span><strong>1</strong>" in duplicate.data
+        expected_rows = 13 if mode == "standard" else 7
+        assert f"data-visible-count>{expected_rows}</strong>".encode() in duplicate.data
+
+
 import pytest
 
 
