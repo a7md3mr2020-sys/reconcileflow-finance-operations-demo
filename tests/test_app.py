@@ -176,7 +176,7 @@ def test_detailed_demo_and_export(client):
 
 
 def test_invoice_tracking_views_export_and_workshop(client):
-    for tab in ("overview", "companies", "analysis", "activity"):
+    for tab in ("overview", "companies", "names", "analysis", "activity"):
         response = client.get(f"/invoice-tracking?tab={tab}")
         assert response.status_code == 200
         assert b"Marine operations invoice follow-up" in response.data
@@ -189,6 +189,101 @@ def test_invoice_tracking_views_export_and_workshop(client):
     assert workshop.status_code == 200
     assert b"Visible identity" in workshop.data
     assert b"Authorized signature and stamp" in workshop.data
+
+
+def test_invoice_updates_flow_through_balances_activity_export_and_report(client):
+    assert client.get("/invoice-tracking?tab=names").status_code == 200
+    token = csrf(client)
+    payment = client.post(
+        "/invoice-tracking/company/CMP-001/tracking",
+        data={"csrf_token": token, "payment": "10000.00", "stage": "paid"},
+    )
+    assert payment.status_code == 200
+    assert payment.json["company"]["balance"] == 25000
+    assert payment.json["company"]["progress"] == 100
+    assert payment.json["summary"]["collected"] == 335000
+
+    identity = client.post(
+        "/invoice-tracking/company/CMP-001/identity",
+        data={"csrf_token": token, "name": "Nile Horizon Tours", "invoice": "130000.00", "paid": "95000.00", "notes": "Reviewed"},
+    )
+    assert identity.status_code == 200
+    assert identity.json["company"]["balance"] == 25000
+    assert identity.json["summary"]["invoice"] == 477500
+    assert identity.json["summary"]["collected"] == 340000
+    assert b"Nile Horizon Tours" in client.get("/invoice-tracking?tab=companies").data
+
+    added = client.post(
+        "/invoice-tracking/companies",
+        data={"csrf_token": token, "name": "Harbor Finance Travel", "invoice": "1000.00", "paid": "200.00"},
+    )
+    assert added.status_code == 200
+    assert added.json["company"]["code"] == "CMP-008"
+    assert added.json["company"]["balance"] == 800
+    assert added.json["summary"]["companies"] == 8
+    assert b"Harbor Finance Travel" in client.get("/report-workshop").data
+
+    activity = client.get("/invoice-tracking?tab=activity")
+    assert b"Payment or stage updated" in activity.data
+    assert b"Company identity or opening amounts updated" in activity.data
+    export = client.get("/invoice-tracking/export.xlsx")
+    workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
+    assert workbook["Company Tracking"].max_row == 9
+    assert workbook["Activity Log"].max_row == 4
+    assert workbook["Summary"]["B2"].value == 8
+    assert workbook["Summary"]["B3"].value == 478500
+    workbook.close()
+
+    second = app_module.app.test_client()
+    assert b"Harbor Finance Travel" not in second.get("/invoice-tracking?tab=names").data
+    assert second.post(
+        "/invoice-tracking/company/CMP-008/tracking",
+        data={"csrf_token": csrf(second), "payment": "1.00", "stage": "paid"},
+    ).status_code == 404
+
+
+def test_invoice_rejects_invalid_amounts_and_keeps_financial_state(client):
+    client.get("/invoice-tracking")
+    token = csrf(client)
+    for value in ("-1", "nan", "1000000000", "wrong"):
+        response = client.post(
+            "/invoice-tracking/company/CMP-001/tracking",
+            data={"csrf_token": token, "payment": value, "stage": "sent"},
+        )
+        assert response.status_code == 400
+    assert client.post(
+        "/invoice-tracking/company/CMP-001/identity",
+        data={"csrf_token": token, "name": "", "invoice": "1", "paid": "1"},
+    ).status_code == 400
+    with app_module.app.test_request_context():
+        with client.session_transaction() as state:
+            app_module.session.update(state)
+        assert app_module.invoice_demo_payload()["companies"][0]["balance"] == 30000
+
+
+def test_invoice_report_and_excel_use_complete_filtered_company_set(client):
+    export = client.get("/invoice-tracking/export.xlsx?direction=payable")
+    assert export.status_code == 200
+    workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
+    assert workbook["Summary"]["B2"].value == 1
+    assert workbook["Summary"]["B3"].value == 72000
+    assert workbook["Summary"]["B6"].value == 8000
+    assert workbook["Summary"]["B7"].value == -8000
+    assert workbook["Company Tracking"].max_row == 2
+    assert workbook["Company Tracking"]["B2"].value == "Blue Wave Travel"
+    workbook.close()
+
+    report = client.get("/report-workshop?direction=payable")
+    assert report.status_code == 200
+    assert b"Blue Wave Travel" in report.data
+    assert b"Nile Horizon Travel" not in report.data
+    assert b"72,000.00" in report.data
+
+    searched = client.get("/invoice-tracking/export.xlsx?q=coastal")
+    workbook = load_workbook(io.BytesIO(searched.data), read_only=True, data_only=True)
+    assert workbook["Company Tracking"].max_row == 2
+    assert workbook["Company Tracking"]["B2"].value == "Coastal Journey Group"
+    workbook.close()
 
 
 def test_operations_control_center_views_and_export(client):

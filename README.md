@@ -37,7 +37,7 @@ The combined Excel export contains a summary, every booking from the selected pr
 
 ### 3. Invoice Tracking
 
-Follow each company through reconciliation, invoice preparation, sending, payment, and closure. The workspace separates total invoice value, recorded paid amount, additional payment, receivable, payable, collection progress, company ranking, and an activity log.
+Follow each company through reconciliation, invoice preparation, sending, payment, and closure. The five-tab workspace separates total invoice value, recorded paid amount, additional payment, receivable, payable, collection progress, company ranking, and an activity log. Company names, invoice values, and opening paid amounts are edited only in the Company Names tab; the Tracking tab accepts additional PAYMENT and stage updates. Changes update the page without a reload, remain isolated to each visitor, and flow through analysis, the activity log, full filtered Excel export, and the Report Workshop.
 
 ## Operations Control Center
 

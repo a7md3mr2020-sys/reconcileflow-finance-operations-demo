@@ -115,6 +115,22 @@
     "Not present": "غير موجود",
     "Overview": "نظرة عامة",
     "Company tracking": "متابعة الشركات",
+    "Company names": "أسماء الشركات",
+    "Reconciled": "تمت المطابقة",
+    "Payment complete": "تم الدفع",
+    "CENTRAL COMPANY REGISTER": "سجل الشركات المركزي",
+    "Company names and opening amounts": "أسماء الشركات والأرصدة الأساسية",
+    "Company or code...": "اسم الشركة أو الكود...",
+    "Invoice total": "إجمالي الفاتورة",
+    "New company": "شركة جديدة",
+    "Company name": "اسم الشركة",
+    "Add company": "إضافة شركة",
+    "Filtered totals": "الإجماليات بعد الفلترة",
+    "Saved": "تم الحفظ",
+    "No changes recorded in this demo session yet.": "لم تسجل تغييرات في هذه الجلسة حتى الآن.",
+    "Payment or stage updated": "تم تعديل الدفعة أو المرحلة",
+    "Company identity or opening amounts updated": "تم تعديل بيانات الشركة أو مبالغها الأساسية",
+    "Company added": "تمت إضافة شركة",
     "Financial analysis": "التحليل المالي",
     "Activity log": "سجل الحركة",
     "Collection rate": "نسبة التحصيل",
@@ -485,6 +501,12 @@
   });
 
   const patterns = [
+    [/^Company name for (.+)$/, "اسم الشركة $1"],
+    [/^Invoice total for (.+)$/, "إجمالي فاتورة $1"],
+    [/^Paid amount for (.+)$/, "المدفوع لشركة $1"],
+    [/^Notes for (.+)$/, "ملاحظات شركة $1"],
+    [/^PAYMENT for (.+)$/, "دفعة شركة $1"],
+    [/^Stage for (.+)$/, "مرحلة شركة $1"],
     [/^(\d+) exact matches$/, "$1 تطابق كامل"],
     [/^(\d+) A rows \/ (\d+) B rows$/, "$1 صف في أ / $2 صف في ب"],
     [/^(\d+) in A \/ (\d+) in B$/, "$1 في أ / $2 في ب"],
@@ -538,7 +560,7 @@
         if (translated !== value) element.setAttribute(attribute, translated.trim());
       });
     });
-    root.querySelectorAll?.("input[value], textarea").forEach((element) => {
+    root.querySelectorAll?.("input[data-report-input], textarea[data-report-input]").forEach((element) => {
       const translated = translate(element.value);
       if (translated !== element.value) element.value = translated.trim();
     });

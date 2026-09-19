@@ -1,0 +1,8 @@
+<tr data-status="{{ row.direction }}" data-code="{{ row.code }}" data-search-text="{{ row.name }} {{ row.code }} {{ row.notes }}">
+  <td>{{ row.code }}</td>
+  <td><input name="name" form="identity-{{ row.code }}" value="{{ row.name }}" required maxlength="120" aria-label="Company name for {{ row.code }}"></td>
+  <td class="number"><input name="invoice" form="identity-{{ row.code }}" type="number" min="0" max="999999999.99" step="0.01" value="{{ '%.2f'|format(row.invoice) }}" aria-label="Invoice total for {{ row.name }}"></td>
+  <td class="number"><input name="paid" form="identity-{{ row.code }}" type="number" min="0" max="999999999.99" step="0.01" value="{{ '%.2f'|format(row.paid) }}" aria-label="Paid amount for {{ row.name }}"></td>
+  <td><input name="notes" form="identity-{{ row.code }}" value="{{ row.notes }}" maxlength="1000" aria-label="Notes for {{ row.name }}"></td>
+  <td><form id="identity-{{ row.code }}" action="{{ url_for('invoice_identity_update', code=row.code) }}" method="post" data-invoice-form><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button button-secondary" type="submit">Save</button></form></td>
+</tr>

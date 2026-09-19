@@ -23,7 +23,7 @@ document.querySelectorAll("[data-table-controls]").forEach((controls) => {
     const query = search.value.trim().toLocaleLowerCase();
     let visible = 0;
     rows.forEach((row) => {
-      const matchesText = !query || row.textContent.toLocaleLowerCase().includes(query);
+      const matchesText = !query || (row.dataset.searchText || row.textContent).toLocaleLowerCase().includes(query);
       const matchesStatus = !status.value || row.dataset.status === status.value;
       row.hidden = !(matchesText && matchesStatus);
       if (!row.hidden) visible += 1;
@@ -40,6 +40,13 @@ document.querySelectorAll("[data-table-controls]").forEach((controls) => {
       const formatted = total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       if (totalCell) totalCell.textContent = formatted;
       if (totalOutput) totalOutput.textContent = formatted;
+    }
+    if (table.hasAttribute("data-invoice-totals")) {
+      ["invoice", "collected", "balance"].forEach((field) => {
+        const output = table.querySelector(`[data-invoice-total="${field}"]`);
+        const total = rows.reduce((sum, row) => sum + (row.hidden ? 0 : Number(row.dataset[field] || 0)), 0);
+        if (output) output.textContent = total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      });
     }
     sessionStorage.setItem(storageKey, JSON.stringify({ search: search.value, status: status.value }));
   };
@@ -129,6 +136,91 @@ document.querySelectorAll("[data-amount-form]").forEach((form) => {
     } finally {
       button.disabled = false;
     }
+  });
+});
+
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-invoice-form]");
+  if (!form) return;
+  event.preventDefault();
+  const button = form.querySelector('button[type="submit"]');
+  const row = form.closest("tr");
+  const originalLabel = button.textContent;
+  let message = form.querySelector("[data-save-message]");
+  if (!message) {
+    message = document.createElement("span");
+    message.dataset.saveMessage = "";
+    message.setAttribute("role", "status");
+    form.append(message);
+  }
+  button.disabled = true;
+  message.textContent = "";
+  try {
+    const response = await fetch(form.action, {
+      method: "POST", body: new FormData(form), headers: { "Accept": "application/json" }
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Could not save this change.");
+    const company = data.company;
+    if (form.hasAttribute("data-invoice-add")) {
+      const container = document.createElement("tbody");
+      container.innerHTML = data.row_html;
+      const newRow = container.querySelector("tr");
+      document.querySelector("[data-invoice-names-body]").append(newRow);
+      form.reset();
+      window.reconcileflowTranslateElement?.(newRow);
+      row?.closest("table")?.dispatchEvent(new CustomEvent("reconcileflow:table-changed"));
+      document.getElementById("invoice-names-table")?.dispatchEvent(new CustomEvent("reconcileflow:table-changed"));
+    } else if (row) {
+      row.dataset.status = company.direction;
+      if (row.closest("#invoice-table")) {
+        row.dataset.searchText = `${company.name} ${company.code} ${company.notes}`;
+        row.dataset.invoice = company.invoice;
+        row.dataset.collected = company.paid + company.payment;
+        row.dataset.balance = company.balance;
+        row.cells[1].querySelector("strong").textContent = company.name;
+        const stage = row.querySelector('select[name="stage"]');
+        stage.value = company.stage;
+        stage.className = `stage-select stage-${company.stage}`;
+        row.querySelector("[data-invoice-value]").textContent = formatAmount(company.invoice);
+        row.querySelector("[data-paid-value]").textContent = formatAmount(company.paid);
+        row.querySelector('input[name="payment"]').value = Number(company.payment).toFixed(2);
+        const balance = row.querySelector("[data-balance-value]");
+        balance.textContent = formatAmount(company.balance);
+        balance.classList.toggle("positive", company.balance > 0);
+        balance.classList.toggle("negative", company.balance < 0);
+        const directionLabel = company.direction[0].toUpperCase() + company.direction.slice(1);
+        row.querySelector("[data-direction]").textContent = window.reconcileflowTranslateText?.(directionLabel) || directionLabel;
+        row.querySelector("[data-progress]").textContent = `${company.progress}%`;
+        row.cells[9].textContent = company.notes;
+      } else {
+        row.dataset.searchText = `${company.name} ${company.code} ${company.notes}`;
+        row.querySelector('input[name="name"]').value = company.name;
+        row.querySelector('input[name="invoice"]').value = Number(company.invoice).toFixed(2);
+        row.querySelector('input[name="paid"]').value = Number(company.paid).toFixed(2);
+      }
+      row.closest("table").dispatchEvent(new CustomEvent("reconcileflow:table-changed"));
+    }
+    button.textContent = window.reconcileflowTranslateText?.("Saved") || "Saved";
+    window.setTimeout(() => { button.textContent = originalLabel; }, 1500);
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.querySelectorAll("[data-invoice-output-link]").forEach((link) => {
+  link.addEventListener("click", () => {
+    const controls = document.querySelector('[data-table-controls="invoice-table"], [data-table-controls="invoice-names-table"]');
+    const url = new URL(link.href);
+    const query = controls?.querySelector("[data-table-search]")?.value.trim() || "";
+    const direction = controls?.querySelector("[data-table-status]")?.value || "";
+    if (query) url.searchParams.set("q", query);
+    else url.searchParams.delete("q");
+    if (direction) url.searchParams.set("direction", direction);
+    else url.searchParams.delete("direction");
+    link.href = url.toString();
   });
 });
 

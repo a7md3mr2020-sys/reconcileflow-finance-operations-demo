@@ -13,6 +13,11 @@
   --shadow: 0 12px 32px rgba(24, 47, 52, 0.08);
 }
 
+@font-face { font-family: "IBM Plex Sans Arabic"; src: url("fonts/IBMPlexSansArabic-Regular.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Arabic"; src: url("fonts/IBMPlexSansArabic-Medium.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Arabic"; src: url("fonts/IBMPlexSansArabic-SemiBold.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans Arabic"; src: url("fonts/IBMPlexSansArabic-Bold.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: swap; }
+
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { scroll-behavior: smooth; }
@@ -27,7 +32,7 @@ a { color: var(--teal); }
 .language-switch { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
 .language-switch a { display: grid; place-items: center; min-width: 34px; height: 32px; padding: 0 8px; color: var(--muted); font-size: 12px; font-weight: 850; text-decoration: none; }
 .language-switch a.active { background: var(--ink); color: #fff; }
-[dir="rtl"] body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; }
+[dir="rtl"] body { font-family: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif; }
 [dir="rtl"] .site-header, [dir="rtl"] .module-header, [dir="rtl"] .result-header, [dir="rtl"] .section-heading, [dir="rtl"] .table-toolbar, [dir="rtl"] footer { direction: rtl; }
 [dir="rtl"] .module-nav, [dir="rtl"] .header-tools, [dir="rtl"] .header-actions, [dir="rtl"] .sample-links { direction: rtl; }
 [dir="rtl"] table { direction: rtl; }
@@ -204,6 +209,26 @@ tr[hidden] { display: none; }
 .ranking-list div { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .ranking-list b { color: var(--gold); }
 .invoice-company-table { margin-bottom: 60px; }
+.invoice-company-table #invoice-table { min-width: 1450px; }
+.invoice-company-table #invoice-names-table { min-width: 1030px; }
+.invoice-company-table #invoice-table td:first-child { white-space: nowrap; }
+.invoice-company-table #invoice-table td:nth-child(2) { min-width: 170px; }
+.invoice-company-table #invoice-table td:nth-child(10) { min-width: 180px; }
+.invoice-company-table td { vertical-align: middle; }
+.invoice-company-table input, .invoice-company-table select { min-height: 36px; max-width: 100%; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
+.invoice-company-table input[type="number"] { width: 120px; text-align: end; font-variant-numeric: tabular-nums; }
+.invoice-company-table input[name="name"] { min-width: 210px; }
+.invoice-company-table input[name="notes"] { min-width: 190px; }
+.invoice-company-table td form[data-invoice-form] { display: grid; gap: 4px; min-width: 72px; }
+.invoice-company-table td form[data-invoice-form] button { min-height: 36px; padding: 6px 10px; color: var(--teal); background: #fff; border-color: var(--line); }
+.invoice-company-table td form[data-invoice-form] button:hover { background: #eef5f4; }
+.invoice-company-table [data-save-message], .invoice-add-form [data-save-message] { color: var(--red); font-size: 12px; }
+.invoice-company-table .stage-select { width: 120px; font-weight: 700; }
+.invoice-add-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 22px 24px; border-top: 1px solid var(--line); }
+.invoice-add-form .field { min-width: 140px; }
+.invoice-add-form .field:first-of-type { flex: 1 1 230px; }
+.invoice-add-form .button { min-height: 40px; }
+.empty-row { padding: 30px; text-align: center; color: var(--muted); }
 .stage { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 750; background: #edf1f1; }
 .stage-matched { color: #7c5814; background: #fff0cf; }
 .stage-prepared { color: #185b73; background: #def1f7; }

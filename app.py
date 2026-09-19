@@ -21,13 +21,14 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from reconcileflow.engine import read_dataset, reconcile
 from reconcileflow.detailed import read_detailed_dataset, reconcile_detailed
+from reconcileflow.invoice_demo import STAGES, amount_to_minor, invoice_view
 from reconcileflow.control_center import control_center_payload
 from reconcileflow.extended_sample_data import (
     DETAILED_A,
     DETAILED_B,
     DETAILED_HEADERS,
+    INVOICE_COMPANIES,
     detailed_records,
-    invoice_payload,
 )
 from reconcileflow.sample_data import HEADERS, SYSTEM_A, SYSTEM_B, records
 
@@ -94,6 +95,35 @@ def init_database():
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_financial_movements_run ON financial_movements(run_id, id DESC)"
         )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS invoice_demo_companies(
+                   owner_id TEXT NOT NULL,
+                   code TEXT NOT NULL,
+                   name TEXT NOT NULL,
+                   invoice_minor INTEGER NOT NULL,
+                   paid_minor INTEGER NOT NULL,
+                   payment_minor INTEGER NOT NULL,
+                   stage TEXT NOT NULL,
+                   notes TEXT NOT NULL,
+                   created_at TEXT NOT NULL,
+                   PRIMARY KEY(owner_id, code)
+               )"""
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS invoice_demo_events(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   owner_id TEXT NOT NULL,
+                   company_code TEXT NOT NULL,
+                   company_name TEXT NOT NULL,
+                   occurred_at TEXT NOT NULL,
+                   action TEXT NOT NULL,
+                   before_minor INTEGER NOT NULL,
+                   after_minor INTEGER NOT NULL
+               )"""
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_invoice_demo_events_owner ON invoice_demo_events(owner_id, id DESC)"
+        )
 
 
 def visitor_id():
@@ -104,6 +134,44 @@ def visitor_id():
 
 def sample_project_id(mode, month):
     return f"portfolio-{mode}-{month}-{visitor_id()}"
+
+
+def ensure_invoice_demo():
+    owner = visitor_id()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=RUN_RETENTION_HOURS)).isoformat()
+    with database() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        expired = [row["owner_id"] for row in connection.execute(
+            "SELECT DISTINCT owner_id FROM invoice_demo_companies WHERE created_at < ?", (cutoff,)
+        )]
+        for old_owner in expired:
+            connection.execute("DELETE FROM invoice_demo_events WHERE owner_id=?", (old_owner,))
+            connection.execute("DELETE FROM invoice_demo_companies WHERE owner_id=?", (old_owner,))
+        exists = connection.execute(
+            "SELECT 1 FROM invoice_demo_companies WHERE owner_id=? LIMIT 1", (owner,)
+        ).fetchone()
+        if not exists:
+            created_at = datetime.now(timezone.utc).isoformat()
+            connection.executemany(
+                """INSERT INTO invoice_demo_companies(
+                       owner_id,code,name,invoice_minor,paid_minor,payment_minor,stage,notes,created_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                [(owner, row["code"], row["name"], amount_to_minor(row["invoice"]),
+                  amount_to_minor(row["paid"]), amount_to_minor(row["payment"]),
+                  row["stage"], row["notes"], created_at) for row in INVOICE_COMPANIES],
+            )
+
+
+def invoice_demo_payload(search="", direction=""):
+    ensure_invoice_demo()
+    with database() as connection:
+        companies = connection.execute(
+            "SELECT * FROM invoice_demo_companies WHERE owner_id=? ORDER BY code", (visitor_id(),)
+        ).fetchall()
+        events = connection.execute(
+            "SELECT * FROM invoice_demo_events WHERE owner_id=? ORDER BY id DESC", (visitor_id(),)
+        ).fetchall()
+    return invoice_view(companies, events, search=search, direction=direction)
 
 
 def store_run(project_name, payload, mode="standard", run_id=None):
@@ -775,14 +843,112 @@ def adjust_project_amount(run_id):
 @app.get("/invoice-tracking")
 def invoice_tracking():
     tab = request.args.get("tab", "overview")
-    if tab not in {"overview", "companies", "analysis", "activity"}:
+    if tab not in {"overview", "companies", "names", "analysis", "activity"}:
         tab = "overview"
-    return render_template("invoice_tracking.html", data=invoice_payload(), tab=tab)
+    return render_template("invoice_tracking.html", data=invoice_demo_payload(), tab=tab)
+
+
+def invoice_update_response(code, changes, action):
+    ensure_invoice_demo()
+    owner = visitor_id()
+    with database() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute(
+            "SELECT * FROM invoice_demo_companies WHERE owner_id=? AND code=?", (owner, code)
+        ).fetchone()
+        if not row:
+            abort(404)
+        old = dict(row)
+        if all(old[key] == value for key, value in changes.items()):
+            return jsonify({"ok": False, "error": "No changes to save."}), 400
+        before = old["invoice_minor"] - old["paid_minor"] - old["payment_minor"]
+        after = changes.get("invoice_minor", old["invoice_minor"]) - changes.get("paid_minor", old["paid_minor"]) - changes.get("payment_minor", old["payment_minor"])
+        assignments = ", ".join(f"{key}=?" for key in changes)
+        connection.execute(
+            f"UPDATE invoice_demo_companies SET {assignments} WHERE owner_id=? AND code=?",
+            (*changes.values(), owner, code),
+        )
+        connection.execute(
+            """INSERT INTO invoice_demo_events(
+                   owner_id,company_code,company_name,occurred_at,action,before_minor,after_minor
+               ) VALUES(?,?,?,?,?,?,?)""",
+            (owner, code, changes.get("name", old["name"]), datetime.now(timezone.utc).isoformat(), action, before, after),
+        )
+    data = invoice_demo_payload()
+    company = next(row for row in data["companies"] if row["code"] == code)
+    return jsonify({"ok": True, "company": company, "summary": data["summary"],
+                    "row_html": render_template("_invoice_demo_name_row.html", row=company)})
+
+
+@app.post("/invoice-tracking/company/<code>/tracking")
+def invoice_tracking_update(code):
+    stage = request.form.get("stage", "")
+    if stage not in STAGES:
+        return jsonify({"ok": False, "error": "Choose a valid stage."}), 400
+    try:
+        payment = amount_to_minor(request.form.get("payment", ""))
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    return invoice_update_response(code, {"payment_minor": payment, "stage": stage}, "Payment or stage updated")
+
+
+@app.post("/invoice-tracking/company/<code>/identity")
+def invoice_identity_update(code):
+    name = " ".join(request.form.get("name", "").split())[:120]
+    if not name:
+        return jsonify({"ok": False, "error": "Company name is required."}), 400
+    try:
+        invoice = amount_to_minor(request.form.get("invoice", ""))
+        paid = amount_to_minor(request.form.get("paid", ""))
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    notes = request.form.get("notes", "").strip()[:1000]
+    return invoice_update_response(
+        code, {"name": name, "invoice_minor": invoice, "paid_minor": paid, "notes": notes},
+        "Company identity or opening amounts updated",
+    )
+
+
+@app.post("/invoice-tracking/companies")
+def invoice_add_company():
+    name = " ".join(request.form.get("name", "").split())[:120]
+    if not name:
+        return jsonify({"ok": False, "error": "Company name is required."}), 400
+    try:
+        invoice = amount_to_minor(request.form.get("invoice", "0"))
+        paid = amount_to_minor(request.form.get("paid", "0"))
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    ensure_invoice_demo()
+    owner = visitor_id()
+    with database() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        codes = [row["code"] for row in connection.execute(
+            "SELECT code FROM invoice_demo_companies WHERE owner_id=?", (owner,)
+        )]
+        number = max((int(code[4:]) for code in codes if code.startswith("CMP-") and code[4:].isdigit()), default=0) + 1
+        code = f"CMP-{number:03d}"
+        connection.execute(
+            """INSERT INTO invoice_demo_companies(
+                   owner_id,code,name,invoice_minor,paid_minor,payment_minor,stage,notes,created_at
+               ) VALUES(?,?,?,?,?,?,?,?,?)""",
+            (owner, code, name, invoice, paid, 0, "waiting", "", datetime.now(timezone.utc).isoformat()),
+        )
+        connection.execute(
+            """INSERT INTO invoice_demo_events(
+                   owner_id,company_code,company_name,occurred_at,action,before_minor,after_minor
+               ) VALUES(?,?,?,?,?,?,?)""",
+            (owner, code, name, datetime.now(timezone.utc).isoformat(), "Company added", 0, invoice - paid),
+        )
+    data = invoice_demo_payload()
+    company = next(row for row in data["companies"] if row["code"] == code)
+    return jsonify({"ok": True, "company": company, "summary": data["summary"],
+                    "row_html": render_template("_invoice_demo_name_row.html", row=company)})
 
 
 @app.get("/invoice-tracking/export.xlsx")
 def invoice_tracking_export():
-    data = invoice_payload()
+    data = invoice_demo_payload(request.args.get("q", ""), request.args.get("direction", ""))
     workbook = Workbook()
     summary = workbook.active
     summary.title = "Summary"
@@ -882,7 +1048,7 @@ def control_center_export():
 def report_workshop():
     return render_template(
         "report_workshop.html",
-        data=invoice_payload(),
+        data=invoice_demo_payload(request.args.get("q", ""), request.args.get("direction", "")),
         report_date=datetime.now().date().isoformat(),
     )
 
