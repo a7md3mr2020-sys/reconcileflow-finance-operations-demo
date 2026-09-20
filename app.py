@@ -370,14 +370,20 @@ def movement_rows(run_ids):
     return [dict(row) for row in rows]
 
 
+def combined_daily_rows(mode, projects):
+    source_a = [dict(row, project_name=project["project_name"]) for project in projects for row in project["source_rows_a"]]
+    source_b = [dict(row, project_name=project["project_name"]) for project in projects for row in project["source_rows_b"]]
+    return [{**row, "project_id": "combined"} for row in daily_matches(
+        source_a, source_b, detailed=mode == "detailed"
+    )]
+
+
 def combined_workspace_payload(mode, projects):
     rows = []
-    daily_rows = []
     for project in projects:
         for result in project["results"]:
             rows.append({**result, "project_id": project["id"], "project_name": project["project_name"]})
-        for result in project.get("daily_results", []):
-            daily_rows.append({**result, "project_id": project["id"], "project_name": project["project_name"]})
+    daily_rows = combined_daily_rows(mode, projects)
     movements = movement_rows([project["id"] for project in projects])
     return {
         "mode": mode,
@@ -922,7 +928,10 @@ def adjust_project_amount(run_id):
         },
         "daily_html": render_template(
             "_daily_match_rows.html",
-            rows=[{**row, "project_id": run_id, "project_name": record["project_name"]} for row in payload["daily_results"]],
+            rows=combined_daily_rows(
+                record["mode"],
+                selected_projects(record["mode"], request.form.getlist("project") or [run_id]),
+            ),
             is_detailed=record["mode"] == "detailed",
         ),
         "summary": payload["summary"],

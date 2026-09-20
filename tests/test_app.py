@@ -333,10 +333,12 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     assert b"Projects operating as one reconciliation workspace" in combined.data
     assert b"May 2026 marine operations" in combined.data
     assert b"June 2026 marine operations" in combined.data
+    sample_daily_count = len(app_module.reconcile(app_module.records(SYSTEM_A), app_module.records(SYSTEM_B))["daily_results"])
+    assert combined.data.count(b'data-project-id="combined"') == sample_daily_count
 
     first = client.post(
         f"/projects/{may_id}/adjustment",
-        data={"csrf_token": csrf(client), "reference": "RF-1001", "side": "system_a", "amount": "200"},
+        data={"csrf_token": csrf(client), "project": [may_id, june_id], "reference": "RF-1001", "side": "system_a", "amount": "200"},
     )
     assert first.status_code == 200
     assert first.json["movement"]["before"] == 250
@@ -345,11 +347,12 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     assert first.json["row"]["amount_variance"] == -50
     assert first.json["summary"]["matched"] == 1
     assert first.json["summary"]["amount_variance"] == 100
-    assert "-50.00" in first.json["daily_html"]
+    assert "-25.00" in first.json["daily_html"]
+    assert "May 2026 marine operations, June 2026 marine operations" in first.json["daily_html"]
 
     second = client.post(
         f"/projects/{may_id}/adjustment",
-        data={"csrf_token": csrf(client), "reference": "RF-1001", "side": "system_a", "amount": "230"},
+        data={"csrf_token": csrf(client), "project": [may_id, june_id], "reference": "RF-1001", "side": "system_a", "amount": "230"},
     )
     assert second.status_code == 200
     assert second.json["movement"]["movement"] == -30
@@ -396,6 +399,11 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
 def test_detailed_projects_adjust_pricing_and_reject_invalid_edits(client):
     assert client.get("/detailed").status_code == 200
     may_id = sample_id(client, "detailed", "may")
+    june_id = sample_id(client, "detailed", "june")
+    combined = client.get(f"/projects/detailed/combined?project={may_id}&project={june_id}")
+    assert combined.status_code == 200
+    assert b"Calculated amount A / B" in combined.data
+    assert b"May 2026 marine operations, June 2026 marine operations" in combined.data
     with app_module.app.test_request_context():
         with client.session_transaction() as state:
             app_module.session.update(state)

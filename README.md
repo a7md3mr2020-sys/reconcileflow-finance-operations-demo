@@ -31,7 +31,7 @@ Use the same project model while extending the primary matching key to date, nor
 
 ## Multi-project workspace and financial movements
 
-Standard and detailed reconciliation each expose a project library with synthetic monthly periods. Any selection can operate as one workspace while every booking retains its original project and reference. Amount adjustments are saved without a page reload, immediately recalculate the affected row and project totals, and post an immutable financial movement containing source, value before, value after, and movement (`before - after`). Consecutive adjustments therefore telescope to the exact net impact instead of double-counting activity.
+Standard and detailed reconciliation each expose a project library with synthetic monthly periods. Any selection can operate as one workspace: matching daily company/trip groups are combined across selected projects, while every source booking retains its original project and reference. Amount adjustments are saved without a page reload, immediately recalculate the affected row and combined daily totals, and post an immutable financial movement containing source, value before, value after, and movement (`before - after`). Consecutive adjustments therefore telescope to the exact net impact instead of double-counting activity.
 
 The combined Excel export contains a summary, every reference result, daily company matching, and the complete financial movement ledger. An amount adjustment updates both matching views and the export.
 

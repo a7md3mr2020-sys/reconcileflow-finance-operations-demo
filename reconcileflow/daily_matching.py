@@ -57,6 +57,7 @@ def daily_matches(system_a, system_b, detailed=False, tolerance=0.01):
         results.append({
             "date": key[0],
             "company": all_rows[0]["company"],
+            "project_name": ", ".join(dict.fromkeys(row["project_name"] for row in all_rows if row.get("project_name"))),
             "trip": all_rows[0]["service"] if detailed else "",
             "references_a": ", ".join(sorted({row.get("reference", "0") for row in left})),
             "references_b": ", ".join(sorted({row.get("reference", "0") for row in right})),
