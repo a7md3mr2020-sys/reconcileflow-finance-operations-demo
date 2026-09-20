@@ -32,7 +32,7 @@
 <section class="data-section" id="daily-matching">
   <div class="section-heading">
     <div><p class="eyebrow">PRIMARY RECONCILIATION</p><h2>Daily company matching{% if is_detailed %} by trip type{% endif %}</h2></div>
-    <span class="visible-counter"><strong data-visible-count>{{ workspace.daily_rows|length }}</strong> visible</span>
+    <span class="visible-counter"><strong data-visible-count>{{ workspace.daily_rows|length }}</strong> <span>visible</span> · <span>Filtered variance</span> <strong data-table-total="daily-matching-table">{{ "{:,.2f}".format(workspace.daily_rows|sum(attribute='variance')) }}</strong></span>
   </div>
   <div class="table-toolbar" data-table-controls="daily-matching-table">
     <label class="search-field"><span>Search</span><input type="search" placeholder="Date, company, trip, reference..." data-table-search></label>

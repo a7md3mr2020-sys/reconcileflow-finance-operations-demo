@@ -97,7 +97,7 @@ input:focus, select:focus { outline: 3px solid rgba(15, 98, 103, .15); border-co
 .search-field, .select-field { display: grid; gap: 5px; }
 .table-wrap { width: 100%; overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { position: sticky; top: 68px; z-index: 4; padding: 12px 14px; text-align: left; color: #425459; background: #eef3f2; border-bottom: 1px solid #ccd7d8; white-space: nowrap; }
+th { position: sticky; top: 0; z-index: 4; padding: 12px 14px; text-align: left; color: #425459; background: #eef3f2; border-bottom: 1px solid #ccd7d8; white-space: nowrap; }
 .capture-mode th { position: static; }
 td { padding: 13px 14px; border-bottom: 1px solid #edf1f1; vertical-align: top; }
 tbody tr:hover { background: #f8fbfa; }
