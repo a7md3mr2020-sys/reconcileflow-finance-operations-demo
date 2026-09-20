@@ -88,7 +88,8 @@ def test_complete_demo_workflow_and_export(client):
     export = client.get(result_url + "/export.xlsx")
     assert export.status_code == 200
     workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
-    assert workbook.sheetnames == ["Summary", "Reconciliation Results", "Company Mappings"]
+    assert workbook.sheetnames == ["Summary", "Reconciliation Results", "Daily Matching", "Company Mappings"]
+    assert workbook["Daily Matching"].max_row > 1
     assert workbook["Reconciliation Results"].max_row == 14
     assert workbook["Reconciliation Results"]["A2"].value == "RF-1001"
     assert workbook["Reconciliation Results"].max_column == 20
@@ -170,7 +171,8 @@ def test_detailed_demo_and_export(client):
     assert b"Hotel or pickup" in page.data
     export = client.get(response.headers["Location"] + "/export.xlsx")
     workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
-    assert workbook.sheetnames == ["Summary", "Detailed Results", "Reference Matching"]
+    assert workbook.sheetnames == ["Summary", "Detailed Results", "Daily Matching", "Reference Matching"]
+    assert workbook["Daily Matching"].max_row > 1
     assert workbook["Detailed Results"].max_row == 8
     workbook.close()
 
@@ -339,6 +341,7 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     assert first.json["row"]["amount_variance"] == -50
     assert first.json["summary"]["matched"] == 1
     assert first.json["summary"]["amount_variance"] == 100
+    assert "-50.00" in first.json["daily_html"]
 
     second = client.post(
         f"/projects/{may_id}/adjustment",
@@ -371,13 +374,16 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     adjusted = next(row for row in run["results"] if row["reference"] == "RF-1001")
     assert adjusted["system_a"]["amount"] == 230
     assert adjusted["amount_variance"] == -20
+    assert round(sum(row["variance"] for row in run["daily_results"]), 2) == run["summary"]["amount_variance"]
     export = client.get(
         f"/projects/standard/combined/export.xlsx?project={may_id}&project={june_id}"
     )
     assert export.status_code == 200
     workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
-    assert workbook.sheetnames == ["Combined Summary", "Combined Bookings", "Financial Movements"]
+    assert workbook.sheetnames == ["Combined Summary", "Combined Bookings", "Daily Matching", "Financial Movements"]
     assert workbook["Combined Bookings"].max_row == 27
+    assert workbook["Daily Matching"].max_row > 1
+    assert round(sum(row[12] for row in workbook["Daily Matching"].iter_rows(min_row=2, values_only=True)), 2) == workbook["Combined Summary"]["B5"].value
     assert workbook["Financial Movements"].max_row == 3
     assert workbook["Combined Summary"]["B6"].value == 20
     workbook.close()

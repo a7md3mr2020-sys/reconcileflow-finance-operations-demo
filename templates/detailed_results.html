@@ -10,7 +10,8 @@
   <article class="kpi"><span>Amount variance</span><strong>{{ "{:,.2f}".format(run.summary.amount_variance) }}</strong><small>A minus B</small></article>
   <article class="kpi"><span>Pricing variance</span><strong>{{ "{:,.2f}".format(run.summary.pricing_variance_a + run.summary.pricing_variance_b) }}</strong><small>Recorded vs calculated</small></article>
 </section>
-<nav class="view-tabs"><a href="#deep-results">Detailed comparison</a><a href="#reference-view">Reference matching</a></nav>
+<nav class="view-tabs"><a href="#daily-matching">Daily matching</a><a href="#deep-results">Detailed comparison</a><a href="#reference-view">Reference matching</a></nav>
+{% set is_detailed = true %}{% include '_daily_project_section.html' %}
 <section class="data-section" id="deep-results">
   <div class="section-heading"><div><p class="eyebrow">DEEP COMPARISON</p><h2>Pricing and operational exceptions</h2></div><span class="visible-counter"><strong data-visible-count>{{ run.summary.total }}</strong> visible</span></div>
   <div class="table-toolbar" data-table-controls="detailed-table"><label class="search-field"><span>Search</span><input type="search" placeholder="Reference, trip, hotel, company..." data-table-search></label><label class="select-field"><span>Status</span><select data-table-status><option value="">All statuses</option><option value="matched">Matched</option><option value="mismatch">Mismatch</option><option value="missing_a">Missing in System A</option><option value="missing_b">Missing in System B</option><option value="duplicate">Duplicate detected</option></select></label></div>

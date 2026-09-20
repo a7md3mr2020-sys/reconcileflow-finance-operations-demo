@@ -107,12 +107,17 @@ tr[hidden] { display: none; }
 .status { display: inline-block; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 780; white-space: nowrap; }
 .status-matched { color: #0d5b3e; background: #e0f3e9; }
 .status-mismatch { color: #8a5611; background: #fff0cf; }
+.status-amount_only { color: #8a5611; background: #fff0cf; }
+.status-pax_only { color: #315e7a; background: #e3f0f7; }
+.status-amount_and_pax { color: #94353c; background: #fde4e6; }
 .status-missing_a, .status-missing_b { color: #94353c; background: #fde4e6; }
 .status-duplicate { color: #4e4a7b; background: #eceafa; }
 .variance.positive { color: var(--green); font-weight: 750; }
 .variance.negative { color: var(--red); font-weight: 750; }
 .mapping-section { margin-bottom: 60px; }
 .compact-table table { min-width: 760px; }
+#daily-matching-table { min-width: 1380px; }
+#daily-matching-table td { white-space: nowrap; }
 .error-page { width: min(760px, 90vw); padding: 100px 0; }
 .error-page .eyebrow { color: var(--teal); }
 .error-page p:not(.eyebrow) { color: var(--muted); font-size: 18px; margin: 18px 0 28px; }

@@ -1,0 +1,16 @@
+{% for row in rows %}
+<tr data-project-id="{{ row.project_id if row.project_id is defined else project_id }}" data-status="{{ row.status }}">
+  {% if show_project|default(true) %}<td>{{ row.project_name }}</td>{% endif %}
+  <td>{{ row.date }}</td>
+  <td>{{ row.company }}</td>
+  {% if is_detailed %}<td>{{ row.trip }}</td>{% endif %}
+  <td><span class="status status-{{ row.status }}">{{ row.status_label }}</span></td>
+  <td class="number">{{ row.rows_a }} / {{ row.rows_b }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.adult_a) }} / {{ "{:,.2f}".format(row.adult_b) }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.child_a) }} / {{ "{:,.2f}".format(row.child_b) }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.amount_a) }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.amount_b) }}</td>
+  <td class="number variance {{ 'negative' if row.variance < 0 else 'positive' if row.variance > 0 else '' }}" data-value="{{ row.variance }}">{{ "{:,.2f}".format(row.variance) }}</td>
+  <td class="reference">{{ row.references_a or '0' }} / {{ row.references_b or '0' }}</td>
+</tr>
+{% endfor %}

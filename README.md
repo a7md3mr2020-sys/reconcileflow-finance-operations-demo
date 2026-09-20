@@ -23,17 +23,17 @@ No login is required and every record is synthetic. Each visitor receives an iso
 
 ### 1. Standard Reconciliation
 
-Work through a library of monthly reconciliation projects. Compare references, dates, companies, services, passenger categories, and amounts, then select several projects and open them as one editable workspace without losing source-project ownership.
+Work through a library of monthly reconciliation projects. The primary matching view groups bookings by date and normalized company, while a separate reference view keeps the booking-number check. Compare passenger categories and amounts, then select several projects and open them as one editable workspace without losing source-project ownership.
 
 ### 2. Detailed Reconciliation
 
-Use the same project model while extending the control into trip type, hotel or pickup, transfer state, adult rate, chargeable passengers, calculated amount, and pricing variance. The child is valued at half the adult rate and the infant has zero cost. If rate or amount is missing, the available value and chargeable passenger count derive it.
+Use the same project model while extending the primary matching key to date, normalized company, and trip type. Review hotel or pickup, transfer state, adult rate, chargeable passengers, calculated amount, and pricing variance; reference matching remains separate. The child is valued at half the adult rate and the infant has zero cost. If rate or amount is missing, the available value and chargeable passenger count derive it.
 
 ## Multi-project workspace and financial movements
 
 Standard and detailed reconciliation each expose a project library with synthetic monthly periods. Any selection can operate as one workspace while every booking retains its original project and reference. Amount adjustments are saved without a page reload, immediately recalculate the affected row and project totals, and post an immutable financial movement containing source, value before, value after, and movement (`before - after`). Consecutive adjustments therefore telescope to the exact net impact instead of double-counting activity.
 
-The combined Excel export contains a summary, every booking from the selected projects, and the complete financial movement ledger.
+The combined Excel export contains a summary, every reference result, daily company matching, and the complete financial movement ledger. An amount adjustment updates both matching views and the export.
 
 ### 3. Invoice Tracking
 

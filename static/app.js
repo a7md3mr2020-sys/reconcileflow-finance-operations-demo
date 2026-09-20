@@ -112,6 +112,19 @@ document.querySelectorAll("[data-amount-form]").forEach((form) => {
         document.querySelector("[data-combined-matched]").textContent = allBookingRows.filter((item) => item.dataset.status === "matched").length;
       }
 
+      const dailyBody = document.querySelector("[data-daily-matching-body]");
+      if (dailyBody && data.daily_html !== undefined) {
+        const projectId = row.dataset.projectId;
+        const existing = Array.from(dailyBody.rows).filter((item) => item.dataset.projectId === projectId);
+        const replacement = document.createElement("tbody");
+        replacement.innerHTML = data.daily_html;
+        if (existing.length) existing[0].before(...Array.from(replacement.rows));
+        else dailyBody.append(...Array.from(replacement.rows));
+        existing.forEach((item) => item.remove());
+        window.reconcileflowTranslateElement?.(dailyBody);
+        dailyBody.closest("table").dispatchEvent(new CustomEvent("reconcileflow:table-changed"));
+      }
+
       const movementBody = document.querySelector("[data-movement-body]");
       const movementRow = document.createElement("tr");
       movementRow.dataset.status = data.movement.side;

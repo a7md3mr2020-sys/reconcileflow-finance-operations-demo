@@ -22,6 +22,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from reconcileflow.engine import read_dataset, reconcile
 from reconcileflow.detailed import read_detailed_dataset, reconcile_detailed
 from reconcileflow.invoice_demo import STAGES, amount_to_minor, invoice_view
+from reconcileflow.daily_matching import daily_matches
 from reconcileflow.control_center import control_center_payload
 from reconcileflow.extended_sample_data import (
     DETAILED_A,
@@ -197,9 +198,11 @@ def get_run(run_id):
         row = connection.execute("SELECT * FROM demo_runs WHERE id=? AND owner_id=?", (run_id, visitor_id())).fetchone()
     if not row:
         return None
+    payload = json.loads(row["payload_json"])
+    ensure_daily_payload(payload, row["mode"])
     return {
         "id": row["id"], "project_name": row["project_name"], "mode": row["mode"],
-        "created_at": row["created_at"], **json.loads(row["payload_json"]),
+        "created_at": row["created_at"], **payload,
     }
 
 
@@ -210,6 +213,16 @@ STATUS_LABELS = {
     "missing_b": "Missing in System B",
     "duplicate": "Duplicate detected",
 }
+
+
+def ensure_daily_payload(payload, mode):
+    if "source_rows_a" not in payload or "source_rows_b" not in payload:
+        payload["source_rows_a"] = [dict(row["system_a"]) for row in payload["results"] if row.get("system_a")]
+        payload["source_rows_b"] = [dict(row["system_b"]) for row in payload["results"] if row.get("system_b")]
+    if "daily_results" not in payload:
+        payload["daily_results"] = daily_matches(
+            payload["source_rows_a"], payload["source_rows_b"], detailed=mode == "detailed"
+        )
 
 
 def recalculate_payload(payload, mode):
@@ -246,7 +259,31 @@ def recalculate_payload(payload, mode):
         summary["pricing_variance_b"] = round(sum(
             (row.get("system_b") or {}).get("pricing_variance", 0) for row in payload["results"]
         ), 2)
+    if "source_rows_a" in payload and "source_rows_b" in payload:
+        payload["daily_results"] = daily_matches(
+            payload["source_rows_a"], payload["source_rows_b"], detailed=mode == "detailed"
+        )
     return payload
+
+
+def update_source_snapshot(payload, side, reference, delta, mode):
+    key = "source_rows_a" if side == "system_a" else "source_rows_b"
+    members = [row for row in payload.get(key, []) if row["reference"] == reference]
+    remaining = round(delta, 2)
+    for row in members:
+        if remaining >= 0:
+            change = remaining
+        else:
+            change = max(remaining, -row["amount"])
+        if change:
+            row["amount"] = round(row["amount"] + change, 2)
+            if mode == "detailed":
+                row["pricing_variance"] = round(row["amount"] - row.get("calculated_amount", 0), 2)
+            remaining = round(remaining - change, 2)
+        if not remaining:
+            break
+    if remaining:
+        raise ValueError("The source booking amounts cannot support this adjustment.")
 
 
 def list_projects(mode):
@@ -292,6 +329,7 @@ def ensure_sample_projects(mode):
         if delta:
             target = next(row for row in payload["results"] if row.get("system_a") and row.get("system_b"))
             target["system_a"]["amount"] = round(target["system_a"]["amount"] + delta, 2)
+            update_source_snapshot(payload, "system_a", target["reference"], delta, mode)
             if mode == "detailed":
                 target["system_a"]["pricing_variance"] = round(
                     target["system_a"]["amount"] - target["system_a"].get("calculated_amount", 0), 2
@@ -334,14 +372,18 @@ def movement_rows(run_ids):
 
 def combined_workspace_payload(mode, projects):
     rows = []
+    daily_rows = []
     for project in projects:
         for result in project["results"]:
             rows.append({**result, "project_id": project["id"], "project_name": project["project_name"]})
+        for result in project.get("daily_results", []):
+            daily_rows.append({**result, "project_id": project["id"], "project_name": project["project_name"]})
     movements = movement_rows([project["id"] for project in projects])
     return {
         "mode": mode,
         "projects": projects,
         "rows": rows,
+        "daily_rows": daily_rows,
         "movements": movements,
         "summary": {
             "projects": len(projects),
@@ -393,6 +435,24 @@ def format_export_sheet(sheet, widths):
         sheet.column_dimensions[get_column_letter(index)].width = width
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = sheet.dimensions
+
+
+def add_daily_sheet(workbook, rows, mode, include_project=False):
+    sheet = workbook.create_sheet("Daily Matching")
+    headers = ["Project"] if include_project else []
+    headers.extend(["Date", "Company"])
+    if mode == "detailed":
+        headers.append("Trip Type")
+    headers.extend(["Status", "Rows A", "Rows B", "Adults A", "Adults B", "Children A", "Children B", "Amount A", "Amount B", "Variance", "References A", "References B"])
+    sheet.append(headers)
+    for row in rows:
+        values = [excel_safe(row["project_name"])] if include_project else []
+        values.extend([row["date"], excel_safe(row["company"])])
+        if mode == "detailed":
+            values.append(excel_safe(row["trip"]))
+        values.extend([row["status_label"], row["rows_a"], row["rows_b"], row["adult_a"], row["adult_b"], row["child_a"], row["child_b"], row["amount_a"], row["amount_b"], row["variance"], excel_safe(row["references_a"]), excel_safe(row["references_b"])])
+        sheet.append(values)
+    format_export_sheet(sheet, ([28] if include_project else []) + [16, 28] + ([26] if mode == "detailed" else []) + [30, 12, 12, 14, 14, 14, 14, 18, 18, 18, 28, 28])
 
 
 def csrf_token():
@@ -556,6 +616,7 @@ def export_results(run_id):
             result["amount_variance"], left.get("row_count", 0), right.get("row_count", 0),
         ])
     format_export_sheet(sheet, [18, 23, 34, 16, 16, 26, 26, 24, 24] + [12] * 11)
+    add_daily_sheet(workbook, run["daily_results"], "standard")
 
     mapping_sheet = workbook.create_sheet("Company Mappings")
     mapping_sheet.append(["System A Label", "System B Label", "Normalized A", "Normalized B", "Result"])
@@ -676,6 +737,7 @@ def detailed_export(run_id):
             left.get("pricing_variance", 0), right.get("pricing_variance", 0),
         ])
     format_export_sheet(detail, [18, 22, 34] + [16, 16, 26, 26, 22, 22, 24, 24] + [13] * 15)
+    add_daily_sheet(workbook, run["daily_results"], "detailed")
     reference = workbook.create_sheet("Reference Matching")
     reference.append(["System A Date", "System B Date", "Reference", "System A Amount", "System B Amount", "Variance", "Status"])
     for row in run["results"]:
@@ -763,6 +825,8 @@ def combined_projects_export(mode):
         bookings.append(values)
     format_export_sheet(bookings, [28, 18, 22, 34, 26, 26] + ([22, 22, 26, 26] if mode == "detailed" else []) + [18, 18, 18])
 
+    add_daily_sheet(workbook, data["daily_rows"], mode, include_project=True)
+
     ledger = workbook.create_sheet("Financial Movements")
     ledger.append(["Adjustment UTC", "Project", "Reference", "Source", "Before", "After", "Movement", "Action"])
     for row in data["movements"]:
@@ -801,6 +865,7 @@ def adjust_project_amount(run_id):
         if not record:
             abort(404)
         payload = json.loads(record["payload_json"])
+        ensure_daily_payload(payload, record["mode"])
         result = next((row for row in payload["results"] if row["reference"] == reference), None)
         source = result.get(side) if result else None
         if source is None:
@@ -809,6 +874,7 @@ def adjust_project_amount(run_id):
         if before_amount == after_amount:
             return jsonify({"ok": False, "error": "Enter an amount different from the current value."}), 400
         source["amount"] = after_amount
+        update_source_snapshot(payload, side, reference, after_amount - before_amount, record["mode"])
         if record["mode"] == "detailed":
             source["pricing_variance"] = round(after_amount - float(source.get("calculated_amount", 0)), 2)
         recalculate_payload(payload, record["mode"])
@@ -836,6 +902,11 @@ def adjust_project_amount(run_id):
             "status": result["status"], "status_label": result["status_label"],
             "differences": result["differences"], "amount_variance": result["amount_variance"],
         },
+        "daily_html": render_template(
+            "_daily_match_rows.html",
+            rows=[{**row, "project_id": run_id, "project_name": record["project_name"]} for row in payload["daily_results"]],
+            is_detailed=record["mode"] == "detailed",
+        ),
         "summary": payload["summary"],
     })
 

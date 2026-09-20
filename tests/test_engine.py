@@ -61,3 +61,37 @@ def test_excel_reader_rejects_invalid_numeric_value():
     row[-1] = "not-a-number"
     with pytest.raises(ValueError, match="amount must be numeric"):
         read_dataset(workbook_bytes(rows=[row]), "broken.xlsx")
+
+
+def test_blank_references_keep_separate_daily_company_balances():
+    first = list(SYSTEM_A[0])
+    second = list(SYSTEM_A[0])
+    first[0] = ""
+    second[0] = None
+    second[2] = "Other Company"
+    parsed = read_dataset(workbook_bytes(rows=[first, second]), "blank-reference.xlsx")
+    assert [row["reference"] for row in parsed] == ["0", "0"]
+    payload = reconcile(parsed, [])
+    assert len(payload["daily_results"]) == 2
+    assert sum(row["variance"] for row in payload["daily_results"]) == 500
+    assert all(row["status"] == "missing_b" for row in payload["daily_results"])
+
+
+def test_daily_matching_aggregates_different_references_for_same_company_day():
+    left = records(SYSTEM_A[:1]) + records(SYSTEM_A[:1])
+    left[1]["reference"] = "OTHER"
+    right = records(SYSTEM_B[:1]) + records(SYSTEM_B[:1])
+    right[1]["reference"] = "DIFFERENT"
+    payload = reconcile(left, right)
+    assert len(payload["daily_results"]) == 1
+    row = payload["daily_results"][0]
+    assert row["status"] == "matched"
+    assert row["rows_a"] == row["rows_b"] == 2
+    assert row["amount_a"] == row["amount_b"] == 500
+
+
+def test_arabic_company_name_is_preserved_for_matching():
+    row = list(SYSTEM_A[0])
+    row[2] = "شركة البحر الأحمر"
+    parsed = read_dataset(workbook_bytes(rows=[row]), "arabic-company.xlsx")
+    assert parsed[0]["company_canonical"] == "شركة البحر الأحمر"

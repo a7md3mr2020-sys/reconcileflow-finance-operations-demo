@@ -12,6 +12,8 @@ from typing import Any, BinaryIO
 
 from openpyxl import load_workbook
 
+from reconcileflow.daily_matching import daily_matches
+
 
 FIELDS = ("reference", "date", "company", "service", "adult", "child", "infant", "amount")
 MAX_DATA_ROWS = 10_000
@@ -42,7 +44,7 @@ STATUS_LABELS = {
 
 def normalize(value: Any) -> str:
     text = unicodedata.normalize("NFKC", str(value or "")).upper().strip()
-    return re.sub(r"\s+", " ", re.sub(r"[^0-9A-Z]+", " ", text)).strip()
+    return re.sub(r"\s+", " ", "".join(char if char.isalnum() else " " for char in text)).strip()
 
 
 def normalize_header(value: Any) -> str:
@@ -137,12 +139,10 @@ def read_dataset(file_obj: BinaryIO, filename: str) -> list[dict[str, Any]]:
         if not any(value not in (None, "") for value in values):
             continue
         get = lambda field: values[mapping[field]] if mapping[field] < len(values) else None
-        reference = normalize(get("reference"))
+        reference = normalize(get("reference")) or "0"
         service_date = parse_date(get("date"))
         company = str(get("company") or "").strip()
         service = str(get("service") or "").strip()
-        if not reference:
-            raise ValueError(f"Row {row_number}: reference is required.")
         if not service_date:
             raise ValueError(f"Row {row_number}: date is invalid or empty.")
         if not normalize(company):
@@ -248,5 +248,8 @@ def reconcile(
             "amount_variance": round(sum(row["amount_variance"] for row in results), 2),
         },
         "results": results,
+        "source_rows_a": system_a,
+        "source_rows_b": system_b,
+        "daily_results": daily_matches(system_a, system_b),
         "mappings": sorted(mappings.values(), key=lambda row: (row["system_a_canonical"], row["system_a"])),
     }

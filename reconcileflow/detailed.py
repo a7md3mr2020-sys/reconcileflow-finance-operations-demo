@@ -10,6 +10,7 @@ from typing import Any, BinaryIO
 from openpyxl import load_workbook
 
 from reconcileflow.engine import canonical_company, normalize, normalize_header, number, parse_date
+from reconcileflow.daily_matching import daily_matches
 
 
 FIELDS = (
@@ -193,4 +194,7 @@ def reconcile_detailed(system_a, system_b, tolerance=0.01):
             "pricing_variance_b": round(sum(row["pricing_variance"] for row in right_rows.values()), 2),
         },
         "results": output,
+        "source_rows_a": system_a,
+        "source_rows_b": system_b,
+        "daily_results": daily_matches(system_a, system_b, detailed=True),
     }

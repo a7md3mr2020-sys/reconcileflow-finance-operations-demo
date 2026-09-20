@@ -1,0 +1,9 @@
+<section class="data-section" id="daily-matching">
+  <div class="section-heading"><div><p class="eyebrow">PRIMARY RECONCILIATION</p><h2>Daily company matching{% if is_detailed %} by trip type{% endif %}</h2></div><span class="visible-counter"><strong data-visible-count>{{ run.daily_results|length }}</strong> visible</span></div>
+  <div class="table-toolbar" data-table-controls="daily-matching-table"><label class="search-field"><span>Search</span><input type="search" placeholder="Date, company, trip, reference..." data-table-search></label><label class="select-field"><span>Status</span><select data-table-status><option value="">All statuses</option><option value="matched">Matched</option><option value="amount_only">Amount difference</option><option value="pax_only">Passenger difference</option><option value="amount_and_pax">Amount and passenger difference</option><option value="missing_a">System B only</option><option value="missing_b">System A only</option></select></label></div>
+  <div class="table-wrap"><table id="daily-matching-table" data-filter-table data-sum-column="{{ 9 if is_detailed else 8 }}">
+    <thead><tr><th>Date</th><th>Company</th>{% if is_detailed %}<th>Trip type</th>{% endif %}<th>Status</th><th class="number">Rows A / B</th><th class="number">Adults A / B</th><th class="number">Children A / B</th><th class="number">System A amount</th><th class="number">System B amount</th><th class="number">Variance</th><th>References A / B</th></tr></thead>
+    <tbody>{% with rows=run.daily_results, show_project=false, project_id=run.id %}{% include '_daily_match_rows.html' %}{% endwith %}</tbody>
+    <tfoot><tr><td colspan="{{ 9 if is_detailed else 8 }}">Filtered variance</td><td class="number" data-filter-total>{{ "{:,.2f}".format(run.daily_results|sum(attribute='variance')) }}</td><td></td></tr></tfoot>
+  </table></div>
+</section>

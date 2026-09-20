@@ -35,3 +35,12 @@ def test_detailed_excel_reader_accepts_expected_template():
     output.seek(0)
     parsed = read_detailed_dataset(output, "detailed.xlsx")
     assert parsed[0]["adult_rate"] == 120
+
+
+def test_detailed_daily_matching_separates_trip_types_at_same_company_and_date():
+    base = {"reference": "", "date": "2026-08-01", "company": "Demo", "pickup": "", "adult": 2, "child": 0, "infant": 0, "adult_rate": 100, "amount": 200}
+    left = [finalize_record({**base, "service": "Island"}), finalize_record({**base, "service": "Reef"})]
+    right = [finalize_record({**base, "service": "Island"})]
+    payload = reconcile_detailed(left, right)
+    assert len(payload["daily_results"]) == 2
+    assert {row["trip"]: row["status"] for row in payload["daily_results"]} == {"Island": "matched", "Reef": "missing_b"}

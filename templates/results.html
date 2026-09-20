@@ -20,6 +20,8 @@
   <article class="kpi"><span>Amount variance</span><strong>{{ "{:,.2f}".format(run.summary.amount_variance) }}</strong><small>System A minus System B</small></article>
 </section>
 
+{% set is_detailed = false %}{% include '_daily_project_section.html' %}
+
 <section class="data-section" aria-labelledby="exceptions-heading">
   <div class="section-heading">
     <div><p class="eyebrow">EXCEPTION REGISTER</p><h2 id="exceptions-heading">Record-level results</h2></div>
