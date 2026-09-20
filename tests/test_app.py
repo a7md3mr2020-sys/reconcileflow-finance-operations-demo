@@ -173,6 +173,10 @@ def test_detailed_demo_and_export(client):
     workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
     assert workbook.sheetnames == ["Summary", "Detailed Results", "Daily Matching", "Reference Matching"]
     assert workbook["Daily Matching"].max_row > 1
+    daily_headers = [cell.value for cell in workbook["Daily Matching"][1]]
+    assert "Calculated Variance" in daily_headers
+    assert "Pickup A" in daily_headers
+    assert "Adult Rate B" in daily_headers
     assert workbook["Detailed Results"].max_row == 8
     workbook.close()
 

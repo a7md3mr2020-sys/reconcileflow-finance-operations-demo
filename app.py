@@ -443,16 +443,34 @@ def add_daily_sheet(workbook, rows, mode, include_project=False):
     headers.extend(["Date", "Company"])
     if mode == "detailed":
         headers.append("Trip Type")
-    headers.extend(["Status", "Rows A", "Rows B", "Adults A", "Adults B", "Children A", "Children B", "Amount A", "Amount B", "Variance", "References A", "References B"])
+    headers.extend(["Status", "Rows A", "Rows B", "Adults A", "Adults B", "Children A", "Children B"])
+    if mode == "detailed":
+        headers.extend(["Pickup A", "Pickup B", "Transfer Rows A", "Transfer Rows B", "Chargeable A", "Chargeable B", "Adult Rate A", "Adult Rate B", "Calculated A", "Calculated B", "Calculated Variance"])
+    headers.extend(["Amount A", "Amount B", "Variance"])
+    if mode == "detailed":
+        headers.extend(["Pricing Variance A", "Pricing Variance B"])
+    headers.extend(["References A", "References B"])
     sheet.append(headers)
     for row in rows:
         values = [excel_safe(row["project_name"])] if include_project else []
         values.extend([row["date"], excel_safe(row["company"])])
         if mode == "detailed":
             values.append(excel_safe(row["trip"]))
-        values.extend([row["status_label"], row["rows_a"], row["rows_b"], row["adult_a"], row["adult_b"], row["child_a"], row["child_b"], row["amount_a"], row["amount_b"], row["variance"], excel_safe(row["references_a"]), excel_safe(row["references_b"])])
+        values.extend([row["status_label"], row["rows_a"], row["rows_b"], row["adult_a"], row["adult_b"], row["child_a"], row["child_b"]])
+        if mode == "detailed":
+            values.extend([excel_safe(row["pickup_a"]), excel_safe(row["pickup_b"]), row["transfer_a"], row["transfer_b"], row["chargeable_a"], row["chargeable_b"], row["rate_a"], row["rate_b"], row["calculated_a"], row["calculated_b"], row["calculated_variance"]])
+        values.extend([row["amount_a"], row["amount_b"], row["variance"]])
+        if mode == "detailed":
+            values.extend([row["pricing_variance_a"], row["pricing_variance_b"]])
+        values.extend([excel_safe(row["references_a"]), excel_safe(row["references_b"])])
         sheet.append(values)
-    format_export_sheet(sheet, ([28] if include_project else []) + [16, 28] + ([26] if mode == "detailed" else []) + [30, 12, 12, 14, 14, 14, 14, 18, 18, 18, 28, 28])
+    widths = ([28] if include_project else []) + [16, 28] + ([26] if mode == "detailed" else []) + [30, 12, 12, 14, 14, 14, 14]
+    if mode == "detailed":
+        widths.extend([28, 28, 12, 12, 16, 16, 16, 16, 18, 18, 18])
+    widths.extend([18, 18, 18])
+    if mode == "detailed":
+        widths.extend([18, 18])
+    format_export_sheet(sheet, widths + [28, 28])
 
 
 def csrf_token():

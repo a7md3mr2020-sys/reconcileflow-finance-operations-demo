@@ -8,9 +8,18 @@
   <td class="number">{{ row.rows_a }} / {{ row.rows_b }}</td>
   <td class="number">{{ "{:,.2f}".format(row.adult_a) }} / {{ "{:,.2f}".format(row.adult_b) }}</td>
   <td class="number">{{ "{:,.2f}".format(row.child_a) }} / {{ "{:,.2f}".format(row.child_b) }}</td>
+  {% if is_detailed %}
+  <td>{{ row.pickup_a or 'No transfer' }} / {{ row.pickup_b or 'No transfer' }}</td>
+  <td class="number">{{ row.transfer_a }} / {{ row.transfer_b }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.chargeable_a) }} / {{ "{:,.2f}".format(row.chargeable_b) }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.rate_a) }} / {{ "{:,.2f}".format(row.rate_b) }}</td>
+  <td class="number">{{ "{:,.2f}".format(row.calculated_a) }} / {{ "{:,.2f}".format(row.calculated_b) }}</td>
+  <td class="number variance {{ 'negative' if row.calculated_variance < 0 else 'positive' if row.calculated_variance > 0 else '' }}">{{ "{:,.2f}".format(row.calculated_variance) }}</td>
+  {% endif %}
   <td class="number">{{ "{:,.2f}".format(row.amount_a) }}</td>
   <td class="number">{{ "{:,.2f}".format(row.amount_b) }}</td>
   <td class="number variance {{ 'negative' if row.variance < 0 else 'positive' if row.variance > 0 else '' }}" data-value="{{ row.variance }}">{{ "{:,.2f}".format(row.variance) }}</td>
+  {% if is_detailed %}<td class="number">{{ "{:,.2f}".format(row.pricing_variance_a) }} / {{ "{:,.2f}".format(row.pricing_variance_b) }}</td>{% endif %}
   <td class="reference">{{ row.references_a or '0' }} / {{ row.references_b or '0' }}</td>
 </tr>
 {% endfor %}

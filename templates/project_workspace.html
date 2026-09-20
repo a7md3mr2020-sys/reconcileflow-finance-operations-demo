@@ -39,10 +39,10 @@
     <label class="select-field"><span>Status</span><select data-table-status><option value="">All statuses</option><option value="matched">Matched</option><option value="amount_only">Amount difference</option><option value="pax_only">Passenger difference</option><option value="amount_and_pax">Amount and passenger difference</option><option value="missing_a">System B only</option><option value="missing_b">System A only</option></select></label>
   </div>
   <div class="table-wrap">
-    <table id="daily-matching-table" data-filter-table data-sum-column="{{ 10 if is_detailed else 9 }}">
-      <thead><tr><th>Project</th><th>Date</th><th>Company</th>{% if is_detailed %}<th>Trip type</th>{% endif %}<th>Status</th><th class="number">Rows A / B</th><th class="number">Adults A / B</th><th class="number">Children A / B</th><th class="number">System A amount</th><th class="number">System B amount</th><th class="number">Variance</th><th>References A / B</th></tr></thead>
+    <table id="daily-matching-table" data-filter-table data-sum-column="{{ 16 if is_detailed else 9 }}">
+      <thead><tr><th>Project</th><th>Date</th><th>Company</th>{% if is_detailed %}<th>Trip type</th>{% endif %}<th>Status</th><th class="number">Rows A / B</th><th class="number">Adults A / B</th><th class="number">Children A / B</th>{% if is_detailed %}<th>Hotel or pickup A / B</th><th class="number">Transfer rows A / B</th><th class="number">Chargeable pax A / B</th><th class="number">Adult rate A / B</th><th class="number">Calculated amount A / B</th><th class="number">Calculated variance</th>{% endif %}<th class="number">System A amount</th><th class="number">System B amount</th><th class="number">Variance</th>{% if is_detailed %}<th class="number">Pricing variance A / B</th>{% endif %}<th>References A / B</th></tr></thead>
       <tbody data-daily-matching-body>{% with rows=workspace.daily_rows %}{% include '_daily_match_rows.html' %}{% endwith %}</tbody>
-      <tfoot><tr><td colspan="{{ 10 if is_detailed else 9 }}">Filtered variance</td><td class="number" data-filter-total>{{ "{:,.2f}".format(workspace.daily_rows|sum(attribute='variance')) }}</td><td></td></tr></tfoot>
+      <tfoot><tr><td colspan="{{ 16 if is_detailed else 9 }}">Filtered variance</td><td class="number" data-filter-total>{{ "{:,.2f}".format(workspace.daily_rows|sum(attribute='variance')) }}</td>{% if is_detailed %}<td></td>{% endif %}<td></td></tr></tfoot>
     </table>
   </div>
 </section>

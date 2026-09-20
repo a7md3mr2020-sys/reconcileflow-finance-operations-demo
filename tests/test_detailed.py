@@ -44,3 +44,8 @@ def test_detailed_daily_matching_separates_trip_types_at_same_company_and_date()
     payload = reconcile_detailed(left, right)
     assert len(payload["daily_results"]) == 2
     assert {row["trip"]: row["status"] for row in payload["daily_results"]} == {"Island": "matched", "Reef": "missing_b"}
+    island = next(row for row in payload["daily_results"] if row["trip"] == "Island")
+    assert island["chargeable_a"] == island["chargeable_b"] == 2
+    assert island["rate_a"] == island["rate_b"] == 100
+    assert island["calculated_a"] == island["calculated_b"] == 200
+    assert island["calculated_variance"] == 0

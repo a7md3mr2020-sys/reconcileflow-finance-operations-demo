@@ -32,6 +32,10 @@ def daily_matches(system_a, system_b, detailed=False, tolerance=0.01):
 
         amount_a, amount_b = total(left, "amount"), total(right, "amount")
         variance = round(amount_a - amount_b, 2)
+        chargeable_a, chargeable_b = total(left, "chargeable_pax"), total(right, "chargeable_pax")
+        calculated_a, calculated_b = total(left, "calculated_amount"), total(right, "calculated_amount")
+        pickup_a = ", ".join(sorted({row.get("pickup", "") for row in left if row.get("pickup")}))
+        pickup_b = ", ".join(sorted({row.get("pickup", "") for row in right if row.get("pickup")}))
         pax = {
             field: (total(left, field), total(right, field))
             for field in ("adult", "child", "infant")
@@ -62,6 +66,16 @@ def daily_matches(system_a, system_b, detailed=False, tolerance=0.01):
             "adult_a": pax["adult"][0], "adult_b": pax["adult"][1],
             "child_a": pax["child"][0], "child_b": pax["child"][1],
             "infant_a": pax["infant"][0], "infant_b": pax["infant"][1],
+            "pickup_a": pickup_a, "pickup_b": pickup_b,
+            "transfer_a": sum(bool(row.get("has_transfer")) for row in left),
+            "transfer_b": sum(bool(row.get("has_transfer")) for row in right),
+            "chargeable_a": chargeable_a, "chargeable_b": chargeable_b,
+            "rate_a": round(calculated_a / chargeable_a, 4) if chargeable_a else 0,
+            "rate_b": round(calculated_b / chargeable_b, 4) if chargeable_b else 0,
+            "calculated_a": calculated_a, "calculated_b": calculated_b,
+            "calculated_variance": round(calculated_a - calculated_b, 2),
+            "pricing_variance_a": total(left, "pricing_variance"),
+            "pricing_variance_b": total(right, "pricing_variance"),
             "status": status, "status_label": STATUS_LABELS[status],
         })
     return results

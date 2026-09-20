@@ -117,6 +117,7 @@ tr[hidden] { display: none; }
 .mapping-section { margin-bottom: 60px; }
 .compact-table table { min-width: 760px; }
 #daily-matching-table { min-width: 1380px; }
+#daily-matching:has(th:nth-child(18)) #daily-matching-table { min-width: 2400px; }
 #daily-matching-table td { white-space: nowrap; }
 .error-page { width: min(760px, 90vw); padding: 100px 0; }
 .error-page .eyebrow { color: var(--teal); }
