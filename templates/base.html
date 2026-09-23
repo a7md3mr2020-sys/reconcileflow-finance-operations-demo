@@ -17,6 +17,7 @@
 </head>
 {% set detailed_active = request.path.startswith('/detailed') or '/detailed/' in request.path %}
 {% set invoice_active = request.path.startswith('/invoice-tracking') %}
+{% set hub_active = request.endpoint == 'hub' %}
 <body class="original-shell" data-mode="{{ 'detailed' if detailed_active else 'standard' }}">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <aside class="sidebar" id="app-sidebar">
@@ -56,7 +57,7 @@
     </div>
   </aside>
   <main class="main" id="main-content" tabindex="-1">
-    <header class="topbar"><div><strong>{{ 'Invoice tracking' if invoice_active else ('Detailed reconciliation' if detailed_active else 'Standard reconciliation') }}</strong><span class="topbar-context">ReconcileFlow</span></div><a class="btn btn-primary topbar-create" href="{{ url_for('invoice_tracking') if invoice_active else (url_for('detailed_workspace') if detailed_active else url_for('index')) }}#upload"><span aria-hidden="true">+</span> {{ 'New tracking project' if invoice_active else 'New project' }}</a></header>
+    <header class="topbar"><div><strong>{{ 'Choose workspace' if hub_active else ('Invoice tracking' if invoice_active else ('Detailed reconciliation' if detailed_active else 'Standard reconciliation')) }}</strong><span class="topbar-context">ReconcileFlow</span></div><a class="btn btn-primary topbar-create" href="{{ url_for('invoice_tracking') if invoice_active else (url_for('detailed_workspace') if detailed_active else url_for('index')) }}#upload"><span aria-hidden="true">+</span> {{ 'New tracking project' if invoice_active else 'New project' }}</a></header>
     {% block content %}{% endblock %}
     <footer class="demo-footer"><span>Finance operations reconciliation</span><span>Synthetic data only</span></footer>
   </main>

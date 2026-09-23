@@ -586,6 +586,8 @@
     [/^(\d+) movements$/, "$1 حركات"],
     [/^(\d+) bookings$/, "$1 حجوزات"],
     [/^(\d+) companies$/, "$1 شركات"],
+    [/^(\d+) projects$/, "$1 مشروعات"],
+    [/^(\d+) project$/, "$1 مشروع"],
     [/^(\d+) open$/, "$1 مفتوحة"],
     [/^(\d+) companies · (\d+) open exceptions$/, "$1 شركة · $2 فروقات مفتوحة"],
     [/^(\d+) projects selected$/, "$1 مشاريع محددة"],
