@@ -59,10 +59,10 @@ def test_health_and_security_headers(client):
 def test_hub_exposes_all_three_workflows_and_report_workshop(client):
     response = client.get("/")
     assert response.status_code == 200
-    for label in (b"Standard Reconciliation", b"Detailed Reconciliation", b"Invoice Tracking", b"Report Workshop"):
+    for label in (b"Choose workspace", b"Standard reconciliation", b"Detailed reconciliation", b"Invoice tracking", b"Report workshop"):
         assert label in response.data
-    assert b"Try the live standard demo" in response.data
-    assert b"Try the live detailed demo" in response.data
+    assert b'href="/standard"' in response.data
+    assert b'href="/detailed"' in response.data
 
 
 def test_hr_live_demo_links_open_ready_combined_workspaces(client):
@@ -349,6 +349,7 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     assert b"System A data" in combined.data
     assert b"System B data" in combined.data
     assert b"Company-name mapping evidence" in combined.data
+    assert b">2.0<" in combined.data
     assert b"May 2026 marine operations" in combined.data
     assert b"June 2026 marine operations" in combined.data
     sample_daily_count = len(app_module.reconcile(app_module.records(SYSTEM_A), app_module.records(SYSTEM_B))["daily_results"])
@@ -428,6 +429,8 @@ def test_detailed_projects_adjust_pricing_and_reject_invalid_edits(client):
     assert b"System A data" in combined.data
     assert b"System B data" in combined.data
     assert b"Company-name mapping evidence" in combined.data
+    assert b"Reference matching" in combined.data
+    assert b">2.0<" in combined.data
     with app_module.app.test_request_context():
         with client.session_transaction() as state:
             app_module.session.update(state)

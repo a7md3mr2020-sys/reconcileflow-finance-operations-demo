@@ -1,0 +1,19 @@
+.original-shell .main { min-width: 0; }
+.original-shell .main > section,
+.original-shell .main > form,
+.original-shell .main > .error-page { max-width: none; margin-left: 0; margin-right: 0; }
+.original-shell .topbar > div { display: flex; flex-direction: column; gap: 2px; }
+.original-shell .topbar-context { color: var(--muted); font-size: 12px; }
+.original-shell .language-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px; }
+.original-shell .language-switch a { min-height: 32px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); text-decoration: none; font-weight: 700; }
+.original-shell .language-switch a.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.original-shell .demo-footer { display: flex; justify-content: space-between; gap: 16px; padding: 22px 4px 4px; color: var(--muted); font-size: 12px; }
+.original-shell .result-header,
+.original-shell .hero,
+.original-shell .workspace-hero { margin-top: 0; }
+.original-shell .view-tabs { position: sticky; top: 64px; z-index: 25; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.original-shell .data-section { scroll-margin-top: 132px; }
+@media (max-width: 900px) {
+  .original-shell .view-tabs { top: 58px; }
+  .original-shell .demo-footer { flex-direction: column; }
+}

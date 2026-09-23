@@ -149,6 +149,21 @@ document.querySelectorAll("[data-amount-form]").forEach((form) => {
   });
 });
 
+const menuToggle = document.querySelector(".mobile-menu-toggle");
+const navigation = document.querySelector("#primary-navigation");
+menuToggle?.addEventListener("click", () => {
+  const expanded = menuToggle.getAttribute("aria-expanded") === "true";
+  menuToggle.setAttribute("aria-expanded", String(!expanded));
+  navigation?.classList.toggle("open", !expanded);
+});
+
+document.querySelector("[data-density-toggle]")?.addEventListener("click", (event) => {
+  document.body.classList.toggle("density-compact");
+  const compact = document.body.classList.contains("density-compact");
+  const label = event.currentTarget.querySelector("[data-density-label]");
+  if (label) label.textContent = compact ? "Comfortable view" : "Compact view";
+});
+
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest("[data-invoice-form]");
   if (!form) return;

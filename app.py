@@ -568,7 +568,13 @@ def set_language(language):
 
 @app.get("/")
 def hub():
-    return render_template("hub.html")
+    ensure_sample_projects("standard")
+    ensure_sample_projects("detailed")
+    return render_template("hub.html", counts={
+        "standard": len(list_projects("standard")),
+        "detailed": len(list_projects("detailed")),
+        "invoices": 1,
+    })
 
 
 @app.get("/try/<mode>")
@@ -890,12 +896,12 @@ def combined_projects_export(mode):
         for row in data["source_rows"][side]:
             values = [
                 excel_safe(row["project_name"]), excel_safe(row.get("reference", "")), row.get("date", ""),
-                excel_safe(row.get("company", "")), row.get("adults", 0), row.get("children", 0), row.get("infants", 0),
+                excel_safe(row.get("company", "")), row.get("adult", 0), row.get("child", 0), row.get("infant", 0),
             ]
             if mode == "detailed":
                 values.extend([
                     excel_safe(row.get("service", "")), excel_safe(row.get("pickup", "")),
-                    "Yes" if row.get("transfer") else "No", row.get("adult_rate", 0), row.get("calculated_amount", 0),
+                    "Yes" if row.get("has_transfer") else "No", row.get("adult_rate", 0), row.get("calculated_amount", 0),
                 ])
             values.append(row.get("amount", 0))
             sheet.append(values)
