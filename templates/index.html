@@ -1,19 +1,7 @@
 {% extends "base.html" %}
 {% block title %}ReconcileFlow | Reconciliation Workspace{% endblock %}
 {% block content %}
-<section class="intro-band">
-  <div class="intro-copy">
-    <a class="back-link" href="{{ url_for('hub') }}">All workflows</a>
-    <p class="eyebrow">01 / STANDARD RECONCILIATION</p>
-    <h1>Find financial discrepancies before they become reporting problems.</h1>
-    <p class="lead">Compare two operational datasets, expose missing and inconsistent records, review company-name mappings, and export an audit-ready exception register.</p>
-  </div>
-  <form action="{{ url_for('load_demo') }}" method="post" class="demo-action">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="button button-primary" type="submit">Load synthetic demo</button>
-    <span>13 booking references, designed to demonstrate every outcome.</span>
-  </form>
-</section>
+{% set mode='standard' %}{% set page_title='Standard reconciliation projects' %}{% set page_subtitle='The stable reconciliation workflow with source data, company identity, comprehensive matching, and reports.' %}{% include '_project_library_original.html' %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -23,7 +11,7 @@
   {% endif %}
 {% endwith %}
 
-<section class="project-library" aria-labelledby="standard-projects-heading">
+<section class="project-library legacy-project-cards" hidden aria-labelledby="standard-projects-heading">
   <div class="section-heading">
     <div><p class="eyebrow">STANDARD PROJECTS</p><h2 id="standard-projects-heading">Monthly reconciliation projects</h2></div>
     <span class="section-note">Select two or more projects to review them as one workspace</span>

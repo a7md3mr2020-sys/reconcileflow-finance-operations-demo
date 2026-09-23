@@ -544,6 +544,16 @@
     ,"Infants": "الرضع"
     ,"Transfer": "الترانسفير"
     ,"Calculated amount": "المبلغ المحسوب"
+    ,"Project count": "عدد المشروعات"
+    ,"Standard reconciliation projects": "مشروعات المطابقة العادية"
+    ,"Detailed reconciliation projects": "مشروعات المطابقة العميقة"
+    ,"The stable reconciliation workflow with source data, company identity, comprehensive matching, and reports.": "مسار المطابقة المستقر مع بيانات المصادر وربط الشركات والمطابقة الشاملة والتقارير."
+    ,"Detailed trip, pricing, hotel or pickup, and reference-level reconciliation.": "مطابقة تفصيلية للرحلة والتسعير والفندق أو نقطة الالتقاء والرقم المرجعي."
+    ,"Select several periods to open them as one project": "حدد عدة فترات لفتحها كمشروع واحد"
+    ,"Created": "الإنشاء"
+    ,"Match progress": "تقدم المطابقة"
+    ,"Actions": "الإجراءات"
+    ,"Open": "فتح"
   };
 
   const differenceTerms = {

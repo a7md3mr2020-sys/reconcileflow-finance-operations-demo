@@ -1,0 +1,24 @@
+<section class="page-heading"><div><h1>{{ page_title }}</h1><p>{{ page_subtitle }}</p></div></section>
+<div class="kpi-grid compact">
+  <div class="kpi"><span>Project count</span><strong>{{ projects|length }}</strong></div>
+  <div class="kpi"><span>Total references</span><strong>{{ projects|sum(attribute='summary.total') }}</strong></div>
+  <div class="kpi positive"><span>Exact matches</span><strong>{{ projects|sum(attribute='summary.matched') }}</strong></div>
+  <div class="kpi {{ 'negative' if projects|sum(attribute='summary.amount_variance') else 'positive' }}"><span>Amount variance</span><strong>{{ '{:,.2f}'.format(projects|sum(attribute='summary.amount_variance')) }}</strong></div>
+</div>
+<div class="card project-register">
+  <div class="card-head"><h2>Projects</h2><span>Select several periods to open them as one project</span></div>
+  <form action="{{ url_for('combined_projects', mode=mode) }}" method="get" class="project-picker">
+    <div class="table-wrap"><table><thead><tr><th></th><th>Project</th><th>Created</th><th>Match progress</th><th class="number">Amount variance</th><th class="number">References</th><th>Actions</th></tr></thead><tbody>
+    {% for project in projects %}<tr>
+      <td><input type="checkbox" name="project" value="{{ project.id }}" aria-label="Select {{ project.project_name }}"></td>
+      <td><a class="strong-link" href="{{ url_for('combined_projects', mode=mode, project=project.id) }}">{{ project.project_name }}</a><small class="muted block">{{ mode|title }} reconciliation</small></td>
+      <td>{{ project.created_at[:10] }}</td>
+      <td><div class="project-progress-cell"><strong>{{ project.summary.match_rate }}%</strong><i><b style="width:{{ project.summary.match_rate }}%"></b></i><small>{{ project.summary.matched }} of {{ project.summary.total }} references</small></div></td>
+      <td class="num {{ 'negative' if project.summary.amount_variance < 0 else 'positive' if project.summary.amount_variance > 0 else '' }}">{{ '{:,.2f}'.format(project.summary.amount_variance) }}</td>
+      <td class="num">{{ project.summary.total }}</td>
+      <td><div class="actions"><a class="btn btn-sm btn-primary" href="{{ url_for('combined_projects', mode=mode, project=project.id) }}">Open</a><a class="btn btn-sm" href="{{ url_for('combined_projects_export', mode=mode, project=project.id) }}">Excel</a></div></td>
+    </tr>{% endfor %}
+    </tbody></table></div>
+    <div class="project-picker-actions"><span data-project-selection>0 projects selected</span><button class="btn btn-primary" type="submit" disabled data-open-projects>Open combined workspace</button></div>
+  </form>
+</div>

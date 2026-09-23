@@ -1,23 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Detailed Reconciliation | ReconcileFlow{% endblock %}
 {% block content %}
-<section class="intro-band detailed-hero">
-  <div class="intro-copy">
-    <a class="back-link" href="{{ url_for('hub') }}">All workflows</a>
-    <p class="eyebrow">02 / DETAILED RECONCILIATION</p>
-    <h1>Audit the booking and the pricing logic behind it.</h1>
-    <p class="lead">Compare reference, trip type, hotel or pickup, transfer state, passenger mix, adult rate, calculated amount, and source total without changing the standard workflow.</p>
-  </div>
-  <form action="{{ url_for('load_detailed_demo') }}" method="post" class="demo-action">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="button button-primary" type="submit">Load detailed demo</button>
-    <span>Includes derived rates, missing transfers, pricing differences, and reference exceptions.</span>
-  </form>
-</section>
+{% set mode='detailed' %}{% set page_title='Detailed reconciliation projects' %}{% set page_subtitle='Detailed trip, pricing, hotel or pickup, and reference-level reconciliation.' %}{% include '_project_library_original.html' %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="alerts" role="alert">{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
 
-<section class="project-library" aria-labelledby="detailed-projects-heading">
+<section class="project-library legacy-project-cards" hidden aria-labelledby="detailed-projects-heading">
   <div class="section-heading">
     <div><p class="eyebrow">DETAILED PROJECTS</p><h2 id="detailed-projects-heading">Pricing-level reconciliation projects</h2></div>
     <span class="section-note">Open several periods without losing each booking's source project</span>
