@@ -24,10 +24,29 @@
 </section>
 
 <nav class="view-tabs combined-tabs">
+  <a href="#system-a-data">System A data</a>
+  <a href="#system-b-data">System B data</a>
+  <a href="#company-identity">Company identity</a>
   <a href="#daily-matching">Daily matching</a>
   <a href="#combined-bookings">Combined bookings</a>
   <a href="#movement-ledger">Financial movement ledger</a>
 </nav>
+
+{% for side, title in [('system_a', 'System A data'), ('system_b', 'System B data')] %}
+<section class="data-section" id="{{ side|replace('_', '-') }}-data">
+  <div class="section-heading"><div><p class="eyebrow">SOURCE LEDGER</p><h2>{{ title }}</h2></div><span class="visible-counter"><strong data-visible-count>{{ workspace.source_rows[side]|length }}</strong> visible</span></div>
+  <div class="table-toolbar" data-table-controls="{{ side }}-table"><label class="search-field"><span>Search</span><input type="search" placeholder="Project, reference, date, company..." data-table-search></label></div>
+  <div class="table-wrap"><table id="{{ side }}-table" data-filter-table><thead><tr><th>Project</th><th>Reference</th><th>Date</th><th>Company</th><th class="number">Adults</th><th class="number">Children</th><th class="number">Infants</th>{% if is_detailed %}<th>Trip type</th><th>Hotel or pickup</th><th>Transfer</th><th class="number">Adult rate</th><th class="number">Calculated amount</th>{% endif %}<th class="number">Amount</th></tr></thead><tbody>
+  {% for row in workspace.source_rows[side] %}<tr><td>{{ row.project_name }}</td><td class="reference">{{ row.reference }}</td><td>{{ row.date }}</td><td>{{ row.company }}</td><td class="number">{{ row.adults }}</td><td class="number">{{ row.children }}</td><td class="number">{{ row.infants }}</td>{% if is_detailed %}<td>{{ row.service }}</td><td>{{ row.pickup or 'No transfer' }}</td><td>{{ 'Yes' if row.transfer else 'No' }}</td><td class="number">{{ '%.2f'|format(row.adult_rate) }}</td><td class="number">{{ '%.2f'|format(row.calculated_amount) }}</td>{% endif %}<td class="number">{{ '%.2f'|format(row.amount) }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endfor %}
+
+<section class="data-section" id="company-identity">
+  <div class="section-heading"><div><p class="eyebrow">IDENTITY CONTROL</p><h2>Company-name mapping evidence</h2></div><span class="visible-counter"><strong data-visible-count>{{ workspace.company_links|length }}</strong> links</span></div>
+  <div class="table-toolbar" data-table-controls="company-identity-table"><label class="search-field"><span>Search</span><input type="search" placeholder="Company name..." data-table-search></label><label class="select-field"><span>Status</span><select data-table-status><option value="">All links</option><option value="linked">Linked</option><option value="unlinked">Unlinked</option></select></label></div>
+  <div class="table-wrap"><table id="company-identity-table" data-filter-table><thead><tr><th>System A company</th><th>System B company</th><th>Status</th><th class="number">Matched references</th></tr></thead><tbody>{% for row in workspace.company_links %}<tr data-status="{{ row.status }}"><td>{{ row.system_a }}</td><td>{{ row.system_b }}</td><td><span class="status status-{{ 'matched' if row.status == 'linked' else 'missing_a' }}">{{ row.status|title }}</span></td><td class="number">{{ row.evidence }}</td></tr>{% endfor %}</tbody></table></div>
+</section>
 
 <section class="data-section" id="daily-matching">
   <div class="section-heading">

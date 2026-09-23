@@ -346,6 +346,9 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     )
     assert combined.status_code == 200
     assert b"Projects operating as one reconciliation workspace" in combined.data
+    assert b"System A data" in combined.data
+    assert b"System B data" in combined.data
+    assert b"Company-name mapping evidence" in combined.data
     assert b"May 2026 marine operations" in combined.data
     assert b"June 2026 marine operations" in combined.data
     sample_daily_count = len(app_module.reconcile(app_module.records(SYSTEM_A), app_module.records(SYSTEM_B))["daily_results"])
@@ -402,7 +405,10 @@ def test_standard_projects_combine_and_adjustments_are_audited(client):
     )
     assert export.status_code == 200
     workbook = load_workbook(io.BytesIO(export.data), read_only=True, data_only=True)
-    assert workbook.sheetnames == ["Combined Summary", "Combined Bookings", "Daily Matching", "Financial Movements"]
+    assert workbook.sheetnames == [
+        "Combined Summary", "Combined Bookings", "Daily Matching", "System A Data",
+        "System B Data", "Company Identity", "Financial Movements",
+    ]
     assert workbook["Combined Bookings"].max_row == 27
     assert workbook["Daily Matching"].max_row > 1
     assert round(sum(row[12] for row in workbook["Daily Matching"].iter_rows(min_row=2, values_only=True)), 2) == workbook["Combined Summary"]["B5"].value
@@ -419,6 +425,9 @@ def test_detailed_projects_adjust_pricing_and_reject_invalid_edits(client):
     assert combined.status_code == 200
     assert b"Calculated amount A / B" in combined.data
     assert b"May 2026 marine operations, June 2026 marine operations" in combined.data
+    assert b"System A data" in combined.data
+    assert b"System B data" in combined.data
+    assert b"Company-name mapping evidence" in combined.data
     with app_module.app.test_request_context():
         with client.session_transaction() as state:
             app_module.session.update(state)

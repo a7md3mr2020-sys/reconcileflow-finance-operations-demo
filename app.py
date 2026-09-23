@@ -380,15 +380,44 @@ def combined_daily_rows(mode, projects):
 
 def combined_workspace_payload(mode, projects):
     rows = []
+    source_rows = {"system_a": [], "system_b": []}
     for project in projects:
+        for side, key in (("system_a", "source_rows_a"), ("system_b", "source_rows_b")):
+            source_rows[side].extend(
+                {**row, "project_id": project["id"], "project_name": project["project_name"]}
+                for row in project[key]
+            )
         for result in project["results"]:
             rows.append({**result, "project_id": project["id"], "project_name": project["project_name"]})
+    company_links = []
+    seen_links = set()
+    for row in rows:
+        left, right = row.get("system_a") or {}, row.get("system_b") or {}
+        left_name, right_name = left.get("company", ""), right.get("company", "")
+        if not left_name and not right_name:
+            continue
+        key = (left_name.casefold(), right_name.casefold())
+        if key in seen_links:
+            continue
+        seen_links.add(key)
+        company_links.append({
+            "system_a": left_name or "Not present",
+            "system_b": right_name or "Not present",
+            "status": "linked" if left_name and right_name else "unlinked",
+            "evidence": sum(
+                1 for candidate in rows
+                if (candidate.get("system_a") or {}).get("company", "").casefold() == key[0]
+                and (candidate.get("system_b") or {}).get("company", "").casefold() == key[1]
+            ),
+        })
     daily_rows = combined_daily_rows(mode, projects)
     movements = movement_rows([project["id"] for project in projects])
     return {
         "mode": mode,
         "projects": projects,
         "rows": rows,
+        "source_rows": source_rows,
+        "company_links": company_links,
         "daily_rows": daily_rows,
         "movements": movements,
         "summary": {
@@ -850,6 +879,33 @@ def combined_projects_export(mode):
     format_export_sheet(bookings, [28, 18, 22, 34, 26, 26] + ([22, 22, 26, 26] if mode == "detailed" else []) + [18, 18, 18])
 
     add_daily_sheet(workbook, data["daily_rows"], mode, include_project=True)
+
+    for side, title in (("system_a", "System A Data"), ("system_b", "System B Data")):
+        sheet = workbook.create_sheet(title)
+        headers = ["Project", "Reference", "Date", "Company", "Adults", "Children", "Infants"]
+        if mode == "detailed":
+            headers.extend(["Trip", "Hotel or Pickup", "Transfer", "Adult Rate", "Calculated Amount"])
+        headers.append("Amount")
+        sheet.append(headers)
+        for row in data["source_rows"][side]:
+            values = [
+                excel_safe(row["project_name"]), excel_safe(row.get("reference", "")), row.get("date", ""),
+                excel_safe(row.get("company", "")), row.get("adults", 0), row.get("children", 0), row.get("infants", 0),
+            ]
+            if mode == "detailed":
+                values.extend([
+                    excel_safe(row.get("service", "")), excel_safe(row.get("pickup", "")),
+                    "Yes" if row.get("transfer") else "No", row.get("adult_rate", 0), row.get("calculated_amount", 0),
+                ])
+            values.append(row.get("amount", 0))
+            sheet.append(values)
+        format_export_sheet(sheet, [28, 18, 15, 28, 12, 12, 12] + ([22, 26, 12, 16, 18] if mode == "detailed" else []) + [18])
+
+    links = workbook.create_sheet("Company Identity")
+    links.append(["System A Company", "System B Company", "Link Status", "Matched References"])
+    for row in data["company_links"]:
+        links.append([excel_safe(row["system_a"]), excel_safe(row["system_b"]), row["status"].title(), row["evidence"]])
+    format_export_sheet(links, [30, 30, 18, 20])
 
     ledger = workbook.create_sheet("Financial Movements")
     ledger.append(["Adjustment UTC", "Project", "Reference", "Source", "Before", "After", "Movement", "Action"])
