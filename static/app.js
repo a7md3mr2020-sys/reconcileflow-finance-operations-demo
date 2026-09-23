@@ -88,7 +88,10 @@ document.querySelectorAll("[data-amount-form]").forEach((form) => {
     input.setCustomValidity("");
     try {
       const response = await fetch(form.action, { method: "POST", body: new FormData(form), headers: { "Accept": "application/json" } });
-      const data = await response.json();
+      const contentType = response.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await response.json()
+        : { ok: false, error: await response.text() || "The adjustment could not be saved." };
       if (!response.ok || !data.ok) throw new Error(data.error || "The adjustment could not be saved.");
 
       input.value = Number(data.movement.after).toFixed(2);

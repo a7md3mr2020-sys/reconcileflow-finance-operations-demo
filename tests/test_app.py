@@ -143,6 +143,21 @@ def test_csrf_is_required(client):
     assert response.status_code == 400
 
 
+def test_csrf_failure_returns_json_for_interactive_requests(client):
+    response = client.post(
+        "/projects/missing/adjustment",
+        data={"reference": "RF-1001", "side": "system_a", "amount": "10"},
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert response.is_json
+    assert response.get_json() == {
+        "ok": False,
+        "error": "The form expired. Refresh the page and try again.",
+    }
+
+
 def test_unknown_result_is_404(client):
     assert client.get("/results/unknown").status_code == 404
 

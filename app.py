@@ -1158,12 +1158,18 @@ def health():
 
 @app.errorhandler(400)
 def bad_request(error):
-    return render_template("error.html", title="Request could not be processed", message=getattr(error, "description", "Check the submitted data and try again.")), 400
+    message = getattr(error, "description", "Check the submitted data and try again.")
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify({"ok": False, "error": message}), 400
+    return render_template("error.html", title="Request could not be processed", message=message), 400
 
 
 @app.errorhandler(404)
 def not_found(_error):
-    return render_template("error.html", title="Page not found", message="The requested demo result is unavailable or has expired."), 404
+    message = "The requested demo result is unavailable or has expired."
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify({"ok": False, "error": message}), 404
+    return render_template("error.html", title="Page not found", message=message), 404
 
 
 @app.errorhandler(413)
